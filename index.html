@@ -29,6 +29,16 @@
             muted
             playsinline
           ></video>
+          <div
+            id="recording-indicator"
+            class="recording-indicator"
+            aria-live="polite"
+            hidden
+          >
+            <span class="recording-dot" aria-hidden="true"></span>
+            <span class="recording-label">REC</span>
+            <span id="recording-countdown" class="recording-countdown">00:15</span>
+          </div>
         </div>
 
         <div class="control-row" aria-label="Camera controls">
