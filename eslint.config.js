@@ -6,7 +6,7 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ["scripts/**/*.js"],
+    files: ["scripts/**/*.js", "playwright.config.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
