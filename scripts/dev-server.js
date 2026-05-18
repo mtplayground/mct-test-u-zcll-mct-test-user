@@ -48,7 +48,9 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, host);
+server.listen(port, host, () => {
+  console.log("ready");
+});
 
 server.on("error", (error) => {
   console.error(`Failed to start dev server: ${error.message}`);
