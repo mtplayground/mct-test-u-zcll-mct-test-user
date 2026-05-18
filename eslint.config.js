@@ -6,6 +6,17 @@ export default [
   },
   js.configs.recommended,
   {
+    files: ["scripts/**/*.js"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      globals: {
+        console: "readonly",
+        process: "readonly",
+      },
+    },
+  },
+  {
     files: ["**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,

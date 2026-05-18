@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 8080",
+    "dev": "node scripts/dev-server.js",
     "test": "node --test",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{html,css,js,json,md}\""
@@ -12,7 +12,6 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.4.0",
-    "prettier": "^3.8.3",
-    "vite": "^8.0.13"
+    "prettier": "^3.8.3"
   }
 }
