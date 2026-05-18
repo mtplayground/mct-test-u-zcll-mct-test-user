@@ -48,10 +48,7 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, host, () => {
-  console.log(`ZeroClaw dev server running at http://localhost:${port}/`);
-  console.log(`Bound to http://${host}:${port}/`);
-});
+server.listen(port, host);
 
 server.on("error", (error) => {
   console.error(`Failed to start dev server: ${error.message}`);
