@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { initGallery, renderGallery } from "../js/gallery.js";
+import { handleClearAll, initGallery, renderGallery } from "../js/gallery.js";
 import { addItem, listItems } from "../js/storage.js";
 
 describe("gallery rendering", () => {
@@ -58,10 +58,14 @@ describe("gallery rendering", () => {
   });
 
   it("subscribes to storage changes and re-renders from storage", () => {
-    document.body.innerHTML = `<div id="gallery"></div>`;
+    document.body.innerHTML = `
+      <button id="clear-gallery" type="button">Clear All</button>
+      <div id="gallery"></div>
+    `;
 
     const unsubscribe = initGallery(document);
     expect(document.querySelector(".empty-state")).not.toBeNull();
+    expect(document.querySelector("#clear-gallery").disabled).toBe(true);
 
     addItem({
       createdAt: "2026-05-18T12:00:00.000Z",
@@ -72,6 +76,7 @@ describe("gallery rendering", () => {
 
     expect(document.querySelectorAll(".gallery-card")).toHaveLength(1);
     expect(document.querySelector("img")?.src).toBe("data:image/jpeg;base64,picture");
+    expect(document.querySelector("#clear-gallery").disabled).toBe(false);
 
     unsubscribe();
 
@@ -82,6 +87,59 @@ describe("gallery rendering", () => {
       type: "picture",
     });
 
+    expect(document.querySelectorAll(".gallery-card")).toHaveLength(1);
+  });
+
+  it("clears all captures after confirmation and disables the header button", () => {
+    document.body.innerHTML = `
+      <button id="clear-gallery" type="button">Clear All</button>
+      <div id="gallery"></div>
+    `;
+    window.confirm = vi.fn(() => true);
+
+    initGallery(document);
+    addItem({
+      createdAt: "2026-05-18T12:00:00.000Z",
+      data: "data:image/jpeg;base64,picture",
+      id: "picture-1",
+      type: "picture",
+    });
+    addItem({
+      createdAt: "2026-05-18T12:01:00.000Z",
+      data: "data:video/webm;base64,video",
+      id: "video-1",
+      type: "video",
+    });
+
+    document.querySelector("#clear-gallery").click();
+
+    expect(window.confirm).toHaveBeenCalledWith("Delete all captures?");
+    expect(listItems()).toEqual([]);
+    expect(document.querySelector("#clear-gallery").disabled).toBe(true);
+    expect(document.querySelector(".empty-state")?.textContent).toBe(
+      "No captures yet.",
+    );
+  });
+
+  it("keeps all captures when clear all is cancelled", () => {
+    document.body.innerHTML = `
+      <button id="clear-gallery" type="button">Clear All</button>
+      <div id="gallery"></div>
+    `;
+    window.confirm = vi.fn(() => false);
+
+    initGallery(document);
+    addItem({
+      createdAt: "2026-05-18T12:00:00.000Z",
+      data: "data:image/jpeg;base64,picture",
+      id: "picture-1",
+      type: "picture",
+    });
+
+    expect(handleClearAll(document.querySelector("#clear-gallery"))).toBe(false);
+
+    expect(listItems()).toHaveLength(1);
+    expect(document.querySelector("#clear-gallery").disabled).toBe(false);
     expect(document.querySelectorAll(".gallery-card")).toHaveLength(1);
   });
 
