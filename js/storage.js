@@ -1,5 +1,7 @@
 export const STORAGE_KEY = "snapvault:v1:items";
 export const SCHEMA_VERSION = 1;
+export const STORAGE_CHANGED_EVENT = "storage:changed";
+export const STORAGE_QUOTA_EXCEEDED_EVENT = "storage:quota-exceeded";
 
 export function listItems() {
   return readStore().items.map(cloneItem);
@@ -27,7 +29,13 @@ export function addItem(item) {
     throw error;
   }
 
-  return cloneItem(nextItem);
+  const addedItem = cloneItem(nextItem);
+  emitStorageChanged("add", {
+    itemId: addedItem.id,
+    itemType: addedItem.type,
+  });
+
+  return addedItem;
 }
 
 export function removeItem(id) {
@@ -40,11 +48,15 @@ export function removeItem(id) {
   }
 
   writeStore(createStore(nextItems));
+  emitStorageChanged("remove", {
+    itemId,
+  });
   return true;
 }
 
 export function clearAll() {
   writeStore(createStore());
+  emitStorageChanged("clear");
 }
 
 function readStore() {
@@ -153,6 +165,23 @@ function restorePriorState(storage, priorValue) {
 }
 
 function emitQuotaExceeded(item, error) {
+  dispatchStorageEvent(STORAGE_QUOTA_EXCEEDED_EVENT, {
+    error,
+    itemId: item.id,
+    itemType: item.type,
+    key: STORAGE_KEY,
+  });
+}
+
+function emitStorageChanged(action, detail = {}) {
+  dispatchStorageEvent(STORAGE_CHANGED_EVENT, {
+    action,
+    key: STORAGE_KEY,
+    ...detail,
+  });
+}
+
+function dispatchStorageEvent(eventName, detail) {
   if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
     return;
   }
@@ -163,13 +192,8 @@ function emitQuotaExceeded(item, error) {
   }
 
   window.dispatchEvent(
-    new CustomEventConstructor("storage:quota-exceeded", {
-      detail: {
-        error,
-        itemId: item.id,
-        itemType: item.type,
-        key: STORAGE_KEY,
-      },
+    new CustomEventConstructor(eventName, {
+      detail,
     }),
   );
 }
