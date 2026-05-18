@@ -1,5 +1,6 @@
 import { getStream } from "./camera.js";
 import { capturePicture, recordVideo } from "./capture.js";
+import { initGallery } from "./gallery.js";
 import { addItem } from "./storage.js";
 import { newId } from "./utils.js";
 
@@ -10,6 +11,8 @@ let isRecording = false;
 initApp();
 
 export function initApp(root = document) {
+  initGallery(root);
+
   const takePictureButton = root.querySelector("#take-picture");
   const recordVideoButton = root.querySelector("#record-video");
   const videoEl = root.querySelector("#camera-preview");
