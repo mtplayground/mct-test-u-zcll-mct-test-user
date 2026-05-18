@@ -89,9 +89,26 @@ async function startCameraWithVideo({ videoEl, video, facingMode = null }) {
   activeVideoEl = videoEl;
   activeFacingMode = facingMode;
   activeDeviceId = getStreamDeviceId(stream);
-  activeVideoEl.srcObject = stream;
+  await attachStreamToVideo(activeVideoEl, stream);
 
   return stream;
+}
+
+async function attachStreamToVideo(videoEl, stream) {
+  videoEl.autoplay = true;
+  videoEl.muted = true;
+  videoEl.playsInline = true;
+  videoEl.srcObject = stream;
+
+  if (typeof videoEl.play !== "function") {
+    return;
+  }
+
+  try {
+    await videoEl.play();
+  } catch {
+    // The stream is still attached; callers can surface capture errors if playback stalls.
+  }
 }
 
 async function startCameraWithNextDevice({ videoEl, previousDeviceId, facingMode }) {

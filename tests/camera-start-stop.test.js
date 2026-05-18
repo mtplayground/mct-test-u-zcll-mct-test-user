@@ -25,6 +25,9 @@ describe("camera start and stop", () => {
     await expect(startCamera({ videoEl, facingMode: "user" })).resolves.toBe(stream);
     expect(getStream()).toBe(stream);
     expect(videoEl.srcObject).toBe(stream);
+    expect(videoEl.autoplay).toBe(true);
+    expect(videoEl.muted).toBe(true);
+    expect(videoEl.playsInline).toBe(true);
     expect(mediaDevices.getUserMedia).toHaveBeenCalledWith({
       audio: true,
       video: { facingMode: "user" },

@@ -65,6 +65,8 @@ npm test
 npm run format
 ```
 
+For manual device coverage, use `docs/manual-cross-device-checklist.md`.
+
 ## HTTPS Requirement
 
 Camera APIs require a secure context. In production, serve the app over HTTPS. Plain
