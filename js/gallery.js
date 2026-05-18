@@ -1,18 +1,25 @@
-import { listItems, removeItem, STORAGE_CHANGED_EVENT } from "./storage.js";
+import { clearAll, listItems, removeItem, STORAGE_CHANGED_EVENT } from "./storage.js";
 import { formatTimestamp } from "./utils.js";
 
 const EMPTY_MESSAGE = "No captures yet.";
 
 export function initGallery(root = document) {
   const container = root.querySelector("#gallery");
+  const clearButton = root.querySelector("#clear-gallery");
 
   if (!container) {
     return noop;
   }
 
   const render = () => {
-    renderGallery(container);
+    renderGallery(container, listItems(), { clearButton });
   };
+
+  if (clearButton) {
+    clearButton.addEventListener("click", () => {
+      handleClearAll(clearButton);
+    });
+  }
 
   render();
 
@@ -26,8 +33,13 @@ export function initGallery(root = document) {
   return noop;
 }
 
-export function renderGallery(container, items = listItems()) {
+export function renderGallery(
+  container,
+  items = listItems(),
+  { clearButton = null } = {},
+) {
   assertContainer(container);
+  setClearButtonState(clearButton, items);
   container.replaceChildren();
 
   if (items.length === 0) {
@@ -41,6 +53,22 @@ export function renderGallery(container, items = listItems()) {
   }
 
   container.append(fragment);
+}
+
+export function handleClearAll(clearButton = null) {
+  const items = listItems();
+  setClearButtonState(clearButton, items);
+
+  if (items.length === 0) {
+    return false;
+  }
+
+  if (!confirmClearAll()) {
+    return false;
+  }
+
+  clearAll();
+  return true;
 }
 
 function createGalleryCard(item) {
@@ -201,6 +229,20 @@ function confirmDelete() {
   }
 
   return window.confirm("Delete this capture?");
+}
+
+function confirmClearAll() {
+  if (typeof window === "undefined" || typeof window.confirm !== "function") {
+    return true;
+  }
+
+  return window.confirm("Delete all captures?");
+}
+
+function setClearButtonState(clearButton, items) {
+  if (clearButton) {
+    clearButton.disabled = items.length === 0;
+  }
 }
 
 function assertContainer(container) {
