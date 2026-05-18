@@ -3,6 +3,8 @@ import { addItem } from "./storage.js";
 import { newId } from "./utils.js";
 
 const TOAST_DURATION_MS = 4000;
+const DEFAULT_RECORDING_SECONDS = 15;
+let isRecording = false;
 
 initApp();
 
@@ -31,6 +33,38 @@ export function handleTakePicture(videoEl) {
     showToast("Picture saved.", "success");
   } catch (error) {
     showToast(getErrorMessage(error), "error");
+  }
+}
+
+export function isCurrentlyRecording() {
+  return isRecording;
+}
+
+export async function runRecordingTask(
+  recordingTask,
+  { maxSeconds = DEFAULT_RECORDING_SECONDS, tick = noop } = {},
+) {
+  if (isRecording) {
+    throw new Error("A recording is already in progress.");
+  }
+
+  if (typeof recordingTask !== "function") {
+    throw new TypeError("runRecordingTask requires a recording task function.");
+  }
+
+  if (typeof tick !== "function") {
+    throw new TypeError("tick must be a function.");
+  }
+
+  const duration = normalizeRecordingSeconds(maxSeconds);
+  isRecording = true;
+  const stopTicker = startCountdownTicker(duration, tick);
+
+  try {
+    return await recordingTask({ maxSeconds: duration });
+  } finally {
+    stopTicker();
+    isRecording = false;
   }
 }
 
@@ -67,4 +101,44 @@ function getErrorMessage(error) {
   }
 
   return "Could not save picture.";
+}
+
+function startCountdownTicker(maxSeconds, tick) {
+  let secondsLeft = Math.ceil(maxSeconds);
+  let lastTick = null;
+  const emitTick = (value) => {
+    if (value === lastTick) {
+      return;
+    }
+
+    lastTick = value;
+    tick(value);
+  };
+
+  emitTick(secondsLeft);
+  const intervalId = setInterval(() => {
+    secondsLeft = Math.max(0, secondsLeft - 1);
+    emitTick(secondsLeft);
+
+    if (secondsLeft === 0) {
+      clearInterval(intervalId);
+    }
+  }, 1000);
+
+  return () => {
+    clearInterval(intervalId);
+    emitTick(0);
+  };
+}
+
+function normalizeRecordingSeconds(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new TypeError("maxSeconds must be a positive number.");
+  }
+
+  return value;
+}
+
+function noop() {
+  return undefined;
 }
