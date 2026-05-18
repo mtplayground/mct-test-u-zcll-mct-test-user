@@ -65,7 +65,8 @@ npm test
 npm run format
 ```
 
-For manual device coverage, use `docs/manual-cross-device-checklist.md`.
+For manual device coverage, use `docs/manual-cross-device-checklist.md`. For the
+accessibility pass, see `docs/accessibility-notes.md`.
 
 ## HTTPS Requirement
 

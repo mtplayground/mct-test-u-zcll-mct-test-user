@@ -75,6 +75,7 @@ export function handleClearAll(clearButton = null) {
 function createGalleryCard(item) {
   const card = document.createElement("article");
   card.className = "gallery-card";
+  card.setAttribute("aria-label", createCardLabel(item));
 
   const media = document.createElement("div");
   media.className = "gallery-card__media";
@@ -104,12 +105,14 @@ function createActions(item) {
 
   const download = document.createElement("a");
   download.className = "gallery-card__download";
+  download.setAttribute("aria-label", `Download ${formatTypeLabel(item.type)}`);
   download.download = createDownloadFilename(item);
   download.href = item.data;
   download.textContent = "Download";
 
   const remove = document.createElement("button");
   remove.className = "gallery-card__delete";
+  remove.setAttribute("aria-label", `Delete ${formatTypeLabel(item.type)}`);
   remove.type = "button";
   remove.textContent = "Delete";
   remove.addEventListener("click", () => {
@@ -165,6 +168,10 @@ function formatTypeLabel(type) {
   }
 
   return "Capture";
+}
+
+function createCardLabel(item) {
+  return `${formatTypeLabel(item.type)} captured ${formatItemTimestamp(item.createdAt)}`;
 }
 
 function formatItemTimestamp(createdAt) {
