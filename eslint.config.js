@@ -25,6 +25,7 @@ export default [
         Blob: "readonly",
         CustomEvent: "readonly",
         DOMException: "readonly",
+        FileReader: "readonly",
         HTMLCanvasElement: "readonly",
         HTMLVideoElement: "readonly",
         MediaDevices: "readonly",
