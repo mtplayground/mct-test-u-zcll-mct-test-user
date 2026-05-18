@@ -222,7 +222,7 @@ button:focus-visible {
 
 .gallery-card__meta {
   display: grid;
-  gap: 0.25rem;
+  gap: var(--space-1);
   padding: var(--space-2);
 }
 
@@ -234,6 +234,50 @@ button:focus-visible {
 .gallery-card__time {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.gallery-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+
+.gallery-card__download,
+.gallery-card__delete {
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: inline-flex;
+  flex: 1 1 6rem;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  justify-content: center;
+  min-height: var(--tap-target);
+  padding: 0.55rem 0.75rem;
+  text-decoration: none;
+}
+
+.gallery-card__download {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.gallery-card__download:hover {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+.gallery-card__delete {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.gallery-card__delete:hover {
+  border-color: #c85252;
+  color: #8f2c2c;
 }
 
 .gallery-card__unsupported {
