@@ -49,7 +49,7 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log("ready");
+  console.log("ready zeroclaw static server listening");
 });
 
 server.on("error", (error) => {
