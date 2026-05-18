@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ZeroClaw Camera Capture</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">ZeroClaw</p>
+        <h1>Camera Capture</h1>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="camera-panel" aria-labelledby="camera-title">
+        <div class="section-heading">
+          <h2 id="camera-title">Camera</h2>
+          <p id="camera-status" class="status-text" role="status">Camera is idle.</p>
+        </div>
+
+        <div class="preview-frame">
+          <video id="camera-preview" class="camera-preview" autoplay muted playsinline></video>
+        </div>
+
+        <div class="control-row" aria-label="Camera controls">
+          <button id="start-camera" type="button">Start</button>
+          <button id="stop-camera" type="button">Stop</button>
+          <button id="switch-camera" type="button">Switch</button>
+        </div>
+
+        <div class="control-row" aria-label="Capture controls">
+          <button id="take-picture" type="button">Take Picture</button>
+          <button id="record-video" type="button">Record</button>
+        </div>
+      </section>
+
+      <section class="gallery-panel" aria-labelledby="gallery-title">
+        <div class="section-heading">
+          <h2 id="gallery-title">Gallery</h2>
+          <button id="clear-gallery" type="button">Clear All</button>
+        </div>
+
+        <div id="gallery" class="gallery-grid" aria-live="polite">
+          <p class="empty-state">No captures yet.</p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="js/app.js"></script>
+  </body>
+</html>
