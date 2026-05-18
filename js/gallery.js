@@ -1,4 +1,4 @@
-import { listItems, STORAGE_CHANGED_EVENT } from "./storage.js";
+import { listItems, removeItem, STORAGE_CHANGED_EVENT } from "./storage.js";
 import { formatTimestamp } from "./utils.js";
 
 const EMPTY_MESSAGE = "No captures yet.";
@@ -63,10 +63,34 @@ function createGalleryCard(item) {
   createdAt.dateTime = item.createdAt;
   createdAt.textContent = formatItemTimestamp(item.createdAt);
 
-  meta.append(type, createdAt);
+  meta.append(type, createdAt, createActions(item));
   card.append(media, meta);
 
   return card;
+}
+
+function createActions(item) {
+  const actions = document.createElement("div");
+  actions.className = "gallery-card__actions";
+
+  const download = document.createElement("a");
+  download.className = "gallery-card__download";
+  download.download = createDownloadFilename(item);
+  download.href = item.data;
+  download.textContent = "Download";
+
+  const remove = document.createElement("button");
+  remove.className = "gallery-card__delete";
+  remove.type = "button";
+  remove.textContent = "Delete";
+  remove.addEventListener("click", () => {
+    if (confirmDelete()) {
+      removeItem(item.id);
+    }
+  });
+
+  actions.append(download, remove);
+  return actions;
 }
 
 function createMediaElement(item) {
@@ -126,6 +150,57 @@ function formatItemTimestamp(createdAt) {
   } catch {
     return createdAt;
   }
+}
+
+function createDownloadFilename(item) {
+  return `snapvault-${item.id}.${getFileExtension(item)}`;
+}
+
+function getFileExtension(item) {
+  const mimeType = getDataUrlMimeType(item.data);
+
+  if (mimeType === "image/jpeg") {
+    return "jpg";
+  }
+
+  if (mimeType === "image/png") {
+    return "png";
+  }
+
+  if (mimeType === "image/webp") {
+    return "webp";
+  }
+
+  if (mimeType === "video/mp4") {
+    return "mp4";
+  }
+
+  if (mimeType === "video/webm") {
+    return "webm";
+  }
+
+  if (item.type === "picture") {
+    return "jpg";
+  }
+
+  if (item.type === "video") {
+    return "webm";
+  }
+
+  return "dat";
+}
+
+function getDataUrlMimeType(dataUrl) {
+  const match = /^data:([^;,]+)/.exec(dataUrl);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function confirmDelete() {
+  if (typeof window === "undefined" || typeof window.confirm !== "function") {
+    return true;
+  }
+
+  return window.confirm("Delete this capture?");
 }
 
 function assertContainer(container) {
