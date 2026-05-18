@@ -33,11 +33,18 @@ describe("gallery rendering", () => {
 
     const cards = container.querySelectorAll(".gallery-card");
     expect(cards).toHaveLength(2);
+    expect(cards[0].getAttribute("aria-label")).toContain("Picture captured");
     expect(cards[0].querySelector("img")?.src).toBe("data:image/jpeg;base64,picture");
     expect(cards[0].querySelector(".gallery-card__type")?.textContent).toBe("Picture");
     expect(cards[0].querySelector("time")?.dateTime).toBe("2026-05-18T12:00:00.000Z");
     expect(cards[0].querySelector("a")?.download).toBe("snapvault-picture-1.jpg");
+    expect(cards[0].querySelector("a")?.getAttribute("aria-label")).toBe(
+      "Download Picture",
+    );
     expect(cards[0].querySelector("a")?.href).toBe("data:image/jpeg;base64,picture");
+    expect(cards[0].querySelector("button")?.getAttribute("aria-label")).toBe(
+      "Delete Picture",
+    );
 
     const video = cards[1].querySelector("video");
     expect(video?.controls).toBe(true);
@@ -45,6 +52,9 @@ describe("gallery rendering", () => {
     expect(cards[1].querySelector(".gallery-card__type")?.textContent).toBe("Video");
     expect(cards[1].querySelector("time")?.dateTime).toBe("2026-05-18T12:05:00.000Z");
     expect(cards[1].querySelector("a")?.download).toBe("snapvault-video-1.webm");
+    expect(cards[1].querySelector("a")?.getAttribute("aria-label")).toBe(
+      "Download Video",
+    );
   });
 
   it("renders an empty state when storage has no items", () => {

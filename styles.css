@@ -60,7 +60,12 @@ button:disabled {
 }
 
 button:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}
+
+a:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
   outline-offset: 2px;
 }
 
@@ -201,12 +206,26 @@ button:focus-visible {
 }
 
 .recording-dot {
+  animation: rec-pulse 1.35s ease-in-out infinite;
   background: #e12d39;
   border-radius: 999px;
   box-shadow: 0 0 0 4px rgb(225 45 57 / 20%);
   display: inline-block;
   height: 0.65rem;
   width: 0.65rem;
+}
+
+@keyframes rec-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgb(225 45 57 / 20%);
+    transform: scale(1);
+  }
+
+  50% {
+    box-shadow: 0 0 0 7px rgb(225 45 57 / 10%);
+    transform: scale(0.92);
+  }
 }
 
 .recording-countdown {
@@ -302,6 +321,10 @@ button:focus-visible {
   border-color: var(--accent-strong);
 }
 
+.gallery-card__download:focus-visible {
+  outline-color: color-mix(in srgb, var(--accent-strong) 55%, transparent);
+}
+
 .gallery-card__delete {
   background: var(--surface);
   color: var(--text);
@@ -310,6 +333,10 @@ button:focus-visible {
 .gallery-card__delete:hover {
   border-color: #c85252;
   color: #8f2c2c;
+}
+
+.gallery-card__delete:focus-visible {
+  outline-color: rgb(200 82 82 / 45%);
 }
 
 .gallery-card__unsupported {
@@ -391,5 +418,20 @@ button:focus-visible {
 @media (max-width: 360px) {
   .control-row button {
     flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .recording-dot {
+    animation: none;
   }
 }
