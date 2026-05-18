@@ -8,6 +8,7 @@ const modules = [
   ["gallery", "../js/gallery.js"],
   ["storage", "../js/storage.js"],
   ["ui", "../js/ui.js"],
+  ["utils", "../js/utils.js"],
 ];
 
 describe("module graph", () => {
