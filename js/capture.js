@@ -1,5 +1,11 @@
 const JPEG_MIME_TYPE = "image/jpeg";
 const JPEG_QUALITY = 0.9;
+const DEFAULT_MAX_RECORDING_SECONDS = 15;
+const VIDEO_MIME_TYPES = [
+  "video/webm;codecs=vp9",
+  "video/webm;codecs=vp8",
+  "video/mp4",
+];
 
 export function capturePicture(videoEl) {
   assertVideoElement(videoEl);
@@ -19,6 +25,76 @@ export function capturePicture(videoEl) {
   return canvas.toDataURL(JPEG_MIME_TYPE, JPEG_QUALITY);
 }
 
+export async function recordVideo(
+  stream,
+  { maxSeconds = DEFAULT_MAX_RECORDING_SECONDS } = {},
+) {
+  assertMediaStream(stream);
+  assertMediaRecorderAvailable();
+
+  const durationLimit = normalizeMaxSeconds(maxSeconds);
+  const mimeType = selectSupportedVideoMimeType();
+  const recorder = mimeType
+    ? new MediaRecorder(stream, { mimeType })
+    : new MediaRecorder(stream);
+  const chunks = [];
+  const startedAt = Date.now();
+
+  return new Promise((resolve, reject) => {
+    let timeoutId = null;
+    let settled = false;
+
+    const rejectOnce = (error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeoutId);
+      reject(error);
+    };
+
+    recorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        chunks.push(event.data);
+      }
+    };
+
+    recorder.onerror = (event) => {
+      rejectOnce(event.error || new Error("Video recording failed."));
+    };
+
+    recorder.onstop = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      clearTimeout(timeoutId);
+      const duration = Math.min(durationLimit, (Date.now() - startedAt) / 1000);
+      const outputMimeType = recorder.mimeType || mimeType || "video/webm";
+      const blob = new Blob(chunks, { type: outputMimeType });
+
+      blobToDataUrl(blob)
+        .then((dataUrl) => {
+          resolve({
+            dataUrl,
+            duration,
+            mimeType: blob.type,
+          });
+        })
+        .catch(reject);
+    };
+
+    recorder.start();
+    timeoutId = setTimeout(() => {
+      if (recorder.state !== "inactive") {
+        recorder.stop();
+      }
+    }, durationLimit * 1000);
+  });
+}
+
 function assertVideoElement(videoEl) {
   if (
     typeof HTMLVideoElement === "undefined" ||
@@ -34,4 +110,53 @@ function normalizeDimension(value, fieldName) {
   }
 
   return Math.floor(value);
+}
+
+function assertMediaStream(stream) {
+  if (!stream || typeof stream.getTracks !== "function") {
+    throw new TypeError("recordVideo requires a MediaStream.");
+  }
+}
+
+function assertMediaRecorderAvailable() {
+  if (typeof MediaRecorder !== "function") {
+    throw new Error("MediaRecorder is not available in this browser.");
+  }
+}
+
+function normalizeMaxSeconds(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new TypeError("maxSeconds must be a positive number.");
+  }
+
+  return value;
+}
+
+function selectSupportedVideoMimeType() {
+  if (typeof MediaRecorder.isTypeSupported !== "function") {
+    return "";
+  }
+
+  return (
+    VIDEO_MIME_TYPES.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || ""
+  );
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("Video recording could not be converted to a data URL."));
+    };
+    reader.onerror = () => {
+      reject(reader.error || new Error("Video recording could not be read."));
+    };
+    reader.readAsDataURL(blob);
+  });
 }
