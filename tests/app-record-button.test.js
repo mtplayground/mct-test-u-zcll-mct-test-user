@@ -31,6 +31,7 @@ describe("record button UI wiring", () => {
     }));
     vi.doMock("../js/storage.js", () => ({
       addItem,
+      STORAGE_QUOTA_EXCEEDED_EVENT: "storage:quota-exceeded",
     }));
     vi.doMock("../js/utils.js", () => ({
       newId: () => "video-id",
@@ -90,6 +91,7 @@ describe("record button UI wiring", () => {
     }));
     vi.doMock("../js/storage.js", () => ({
       addItem,
+      STORAGE_QUOTA_EXCEEDED_EVENT: "storage:quota-exceeded",
     }));
     vi.doMock("../js/utils.js", () => ({
       newId: () => "video-id",

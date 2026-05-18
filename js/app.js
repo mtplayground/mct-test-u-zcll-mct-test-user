@@ -2,9 +2,9 @@ import { getStream } from "./camera.js";
 import { capturePicture, recordVideo } from "./capture.js";
 import { initGallery } from "./gallery.js";
 import { addItem } from "./storage.js";
+import { initStatusEvents, showStatus } from "./ui.js";
 import { newId } from "./utils.js";
 
-const TOAST_DURATION_MS = 4000;
 const DEFAULT_RECORDING_SECONDS = 15;
 let isRecording = false;
 
@@ -12,6 +12,7 @@ initApp();
 
 export function initApp(root = document) {
   initGallery(root);
+  initStatusEvents(root);
 
   const takePictureButton = root.querySelector("#take-picture");
   const recordVideoButton = root.querySelector("#record-video");
@@ -43,9 +44,9 @@ export function handleTakePicture(videoEl) {
       id: newId(),
       type: "picture",
     });
-    showToast("Picture saved.", "success");
+    showStatus("success", "Picture saved.");
   } catch (error) {
-    showToast(getErrorMessage(error), "error");
+    showStatus("error", getErrorMessage(error));
   }
 }
 
@@ -64,7 +65,7 @@ export async function handleRecordVideo({
 
   const stream = getStream();
   if (!stream) {
-    showToast("Start the camera before recording.", "error");
+    showStatus("error", "Start the camera before recording.");
     return;
   }
 
@@ -88,9 +89,9 @@ export async function handleRecordVideo({
       id: newId(),
       type: "video",
     });
-    showToast("Video saved.", "success");
+    showStatus("success", "Video saved.");
   } catch (error) {
-    showToast(getErrorMessage(error, "Could not save video."), "error");
+    showStatus("error", getErrorMessage(error, "Could not save video."));
   } finally {
     hideRecordingIndicator(indicatorEl);
     setRecordButtonDisabled(recordButton, false);
@@ -134,33 +135,6 @@ export function formatCountdown(seconds) {
     2,
     "0",
   )}`;
-}
-
-function showToast(message, variant) {
-  const toast = document.createElement("div");
-  toast.className = `toast toast--${variant}`;
-  toast.setAttribute("role", variant === "error" ? "alert" : "status");
-  toast.textContent = message;
-
-  getToastContainer().append(toast);
-  setTimeout(() => {
-    toast.remove();
-  }, TOAST_DURATION_MS);
-}
-
-function getToastContainer() {
-  let container = document.querySelector("#toast-root");
-
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toast-root";
-    container.className = "toast-stack";
-    container.setAttribute("aria-live", "polite");
-    container.setAttribute("aria-atomic", "false");
-    document.body.append(container);
-  }
-
-  return container;
 }
 
 function getErrorMessage(error, fallback = "Could not save picture.") {
