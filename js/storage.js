@@ -7,6 +7,8 @@ export function listItems() {
 
 export function addItem(item) {
   const nextItem = normalizeItem(item);
+  const storage = getStorage();
+  const priorValue = storage.getItem(STORAGE_KEY);
   const store = readStore();
 
   if (store.items.some((storedItem) => storedItem.id === nextItem.id)) {
@@ -14,7 +16,16 @@ export function addItem(item) {
   }
 
   store.items.push(nextItem);
-  writeStore(store);
+  try {
+    writeStore(store, storage);
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      restorePriorState(storage, priorValue);
+      emitQuotaExceeded(nextItem, error);
+    }
+
+    throw error;
+  }
 
   return cloneItem(nextItem);
 }
@@ -53,9 +64,9 @@ function readStore() {
   return normalizeStore(parsedValue);
 }
 
-function writeStore(store) {
+function writeStore(store, storage = getStorage()) {
   const nextStore = normalizeStore(store);
-  getStorage().setItem(STORAGE_KEY, JSON.stringify(nextStore));
+  storage.setItem(STORAGE_KEY, JSON.stringify(nextStore));
 }
 
 function createStore(items = []) {
@@ -130,6 +141,50 @@ function getStorage() {
   }
 
   return localStorage;
+}
+
+function restorePriorState(storage, priorValue) {
+  if (priorValue === null) {
+    storage.removeItem(STORAGE_KEY);
+    return;
+  }
+
+  storage.setItem(STORAGE_KEY, priorValue);
+}
+
+function emitQuotaExceeded(item, error) {
+  if (typeof window === "undefined" || typeof window.dispatchEvent !== "function") {
+    return;
+  }
+
+  const CustomEventConstructor = window.CustomEvent;
+  if (typeof CustomEventConstructor !== "function") {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEventConstructor("storage:quota-exceeded", {
+      detail: {
+        error,
+        itemId: item.id,
+        itemType: item.type,
+        key: STORAGE_KEY,
+      },
+    }),
+  );
+}
+
+function isQuotaExceededError(error) {
+  if (!isRecord(error)) {
+    return false;
+  }
+
+  return (
+    error.name === "QuotaExceededError" ||
+    error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
+    error.code === 22 ||
+    error.code === 1014
+  );
 }
 
 function isRecord(value) {
