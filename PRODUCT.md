@@ -36,6 +36,10 @@ the browser.
 - `js/gallery.js` renders gallery state from storage and reacts to storage changes.
 - `js/ui.js` owns status banners and shared UI events.
 - `js/errors.js` maps media-device errors to user-facing messages.
+- `scripts/dev-server.js` is the lightweight static file server used for local and
+  sprite-hosted runtime. It binds from `HOST`/`PORT`, serves files from the repository
+  root, emits one controlled startup line, and otherwise keeps stdout quiet unless an
+  actual startup error occurs.
 
 ## Testing and Verification
 
@@ -55,3 +59,5 @@ the browser.
   banners.
 - Keep generated artifacts such as `node_modules`, Playwright reports, and test results
   out of git.
+- Keep deployment artifacts and secrets such as `.env.production`, `.deploy_url`, and
+  verification screenshots/scripts out of git.
