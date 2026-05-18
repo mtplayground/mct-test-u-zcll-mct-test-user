@@ -27,10 +27,11 @@ export function capturePicture(videoEl) {
 
 export async function recordVideo(
   stream,
-  { maxSeconds = DEFAULT_MAX_RECORDING_SECONDS } = {},
+  { maxSeconds = DEFAULT_MAX_RECORDING_SECONDS, onStart = noop } = {},
 ) {
   assertMediaStream(stream);
   assertMediaRecorderAvailable();
+  assertOnStartCallback(onStart);
 
   const durationLimit = normalizeMaxSeconds(maxSeconds);
   const mimeType = selectSupportedVideoMimeType();
@@ -43,6 +44,7 @@ export async function recordVideo(
   return new Promise((resolve, reject) => {
     let timeoutId = null;
     let settled = false;
+    let startNotified = false;
 
     const rejectOnce = (error) => {
       if (settled) {
@@ -54,11 +56,44 @@ export async function recordVideo(
       reject(error);
     };
 
+    const stopRecorder = ({ allowAfterSettled = false } = {}) => {
+      if ((!allowAfterSettled && settled) || recorder.state === "inactive") {
+        return;
+      }
+
+      try {
+        recorder.stop();
+      } catch (error) {
+        rejectOnce(error);
+      }
+    };
+
+    const stop = () => {
+      stopRecorder();
+    };
+
+    const notifyStart = () => {
+      if (startNotified || recorder.state !== "recording") {
+        return;
+      }
+
+      startNotified = true;
+
+      try {
+        onStart({ stop });
+      } catch (error) {
+        rejectOnce(error);
+        stopRecorder({ allowAfterSettled: true });
+      }
+    };
+
     recorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
         chunks.push(event.data);
       }
     };
+
+    recorder.onstart = notifyStart;
 
     recorder.onerror = (event) => {
       rejectOnce(event.error || new Error("Video recording failed."));
@@ -87,11 +122,11 @@ export async function recordVideo(
     };
 
     recorder.start();
-    timeoutId = setTimeout(() => {
-      if (recorder.state !== "inactive") {
-        recorder.stop();
-      }
-    }, durationLimit * 1000);
+    notifyStart();
+
+    if (!settled && recorder.state !== "inactive") {
+      timeoutId = setTimeout(stop, durationLimit * 1000);
+    }
   });
 }
 
@@ -132,6 +167,12 @@ function normalizeMaxSeconds(value) {
   return value;
 }
 
+function assertOnStartCallback(onStart) {
+  if (typeof onStart !== "function") {
+    throw new TypeError("onStart must be a function.");
+  }
+}
+
 function selectSupportedVideoMimeType() {
   if (typeof MediaRecorder.isTypeSupported !== "function") {
     return "";
@@ -159,4 +200,8 @@ function blobToDataUrl(blob) {
     };
     reader.readAsDataURL(blob);
   });
+}
+
+function noop() {
+  return undefined;
 }
