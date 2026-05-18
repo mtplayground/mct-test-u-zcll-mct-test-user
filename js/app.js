@@ -1,4 +1,5 @@
-import { capturePicture } from "./capture.js";
+import { getStream } from "./camera.js";
+import { capturePicture, recordVideo } from "./capture.js";
 import { addItem } from "./storage.js";
 import { newId } from "./utils.js";
 
@@ -10,15 +11,24 @@ initApp();
 
 export function initApp(root = document) {
   const takePictureButton = root.querySelector("#take-picture");
+  const recordVideoButton = root.querySelector("#record-video");
   const videoEl = root.querySelector("#camera-preview");
 
-  if (!takePictureButton || !videoEl) {
-    return;
+  if (takePictureButton && videoEl) {
+    takePictureButton.addEventListener("click", () => {
+      handleTakePicture(videoEl);
+    });
   }
 
-  takePictureButton.addEventListener("click", () => {
-    handleTakePicture(videoEl);
-  });
+  if (recordVideoButton) {
+    recordVideoButton.addEventListener("click", () => {
+      handleRecordVideo({
+        countdownEl: root.querySelector("#recording-countdown"),
+        indicatorEl: root.querySelector("#recording-indicator"),
+        recordButton: recordVideoButton,
+      });
+    });
+  }
 }
 
 export function handleTakePicture(videoEl) {
@@ -38,6 +48,50 @@ export function handleTakePicture(videoEl) {
 
 export function isCurrentlyRecording() {
   return isRecording;
+}
+
+export async function handleRecordVideo({
+  countdownEl = null,
+  indicatorEl = null,
+  recordButton = null,
+} = {}) {
+  if (isRecording) {
+    return;
+  }
+
+  const stream = getStream();
+  if (!stream) {
+    showToast("Start the camera before recording.", "error");
+    return;
+  }
+
+  setRecordButtonDisabled(recordButton, true);
+
+  try {
+    const recording = await runRecordingTask(
+      ({ maxSeconds }) => recordVideo(stream, { maxSeconds }),
+      {
+        maxSeconds: DEFAULT_RECORDING_SECONDS,
+        tick: (secondsLeft) => {
+          showRecordingIndicator(indicatorEl, countdownEl, secondsLeft);
+        },
+      },
+    );
+
+    addItem({
+      createdAt: new Date().toISOString(),
+      data: recording.dataUrl,
+      duration: recording.duration,
+      id: newId(),
+      type: "video",
+    });
+    showToast("Video saved.", "success");
+  } catch (error) {
+    showToast(getErrorMessage(error, "Could not save video."), "error");
+  } finally {
+    hideRecordingIndicator(indicatorEl);
+    setRecordButtonDisabled(recordButton, false);
+  }
 }
 
 export async function runRecordingTask(
@@ -68,6 +122,17 @@ export async function runRecordingTask(
   }
 }
 
+export function formatCountdown(seconds) {
+  const totalSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
+  const minutes = Math.floor(totalSeconds / 60);
+  const remainingSeconds = totalSeconds % 60;
+
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(
+    2,
+    "0",
+  )}`;
+}
+
 function showToast(message, variant) {
   const toast = document.createElement("div");
   toast.className = `toast toast--${variant}`;
@@ -95,12 +160,34 @@ function getToastContainer() {
   return container;
 }
 
-function getErrorMessage(error) {
+function getErrorMessage(error, fallback = "Could not save picture.") {
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
-  return "Could not save picture.";
+  return fallback;
+}
+
+function showRecordingIndicator(indicatorEl, countdownEl, secondsLeft) {
+  if (countdownEl) {
+    countdownEl.textContent = formatCountdown(secondsLeft);
+  }
+
+  if (indicatorEl) {
+    indicatorEl.hidden = false;
+  }
+}
+
+function hideRecordingIndicator(indicatorEl) {
+  if (indicatorEl) {
+    indicatorEl.hidden = true;
+  }
+}
+
+function setRecordButtonDisabled(recordButton, disabled) {
+  if (recordButton) {
+    recordButton.disabled = disabled;
+  }
 }
 
 function startCountdownTicker(maxSeconds, tick) {

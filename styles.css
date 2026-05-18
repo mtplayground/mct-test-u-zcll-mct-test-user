@@ -47,6 +47,11 @@ button:hover {
   border-color: var(--accent);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 button:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 35%, transparent);
   outline-offset: 2px;
@@ -122,6 +127,7 @@ button:focus-visible {
   display: flex;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
 .camera-preview {
@@ -130,6 +136,41 @@ button:focus-visible {
   height: 100%;
   object-fit: cover;
   width: 100%;
+}
+
+.recording-indicator {
+  align-items: center;
+  background: rgb(16 24 32 / 82%);
+  border: 1px solid rgb(255 255 255 / 22%);
+  border-radius: 6px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.85rem;
+  font-weight: 800;
+  gap: 0.45rem;
+  left: 1rem;
+  line-height: 1;
+  padding: 0.55rem 0.65rem;
+  position: absolute;
+  top: 1rem;
+}
+
+.recording-indicator[hidden] {
+  display: none;
+}
+
+.recording-dot {
+  background: #e12d39;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgb(225 45 57 / 20%);
+  display: inline-block;
+  height: 0.65rem;
+  width: 0.65rem;
+}
+
+.recording-countdown {
+  font-variant-numeric: tabular-nums;
+  min-width: 2.9rem;
 }
 
 .control-row {
