@@ -127,6 +127,38 @@ button:focus-visible {
   margin: 0;
 }
 
+.status-stack {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) auto 0;
+  max-width: 1180px;
+  padding: 0 clamp(var(--space-3), 4vw, 3rem);
+}
+
+.status-stack:empty {
+  display: none;
+}
+
+.status-banner {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-weight: 700;
+  padding: 0.85rem 1rem;
+}
+
+.status-banner--info {
+  background: #eef6fb;
+  border-color: #81b6ce;
+  color: #16445a;
+}
+
+.status-banner--warning {
+  background: #fff7e6;
+  border-color: #d7a846;
+  color: #5d3f09;
+}
+
 .preview-frame {
   align-items: center;
   aspect-ratio: 16 / 10;

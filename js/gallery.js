@@ -1,7 +1,8 @@
 import { clearAll, listItems, removeItem, STORAGE_CHANGED_EVENT } from "./storage.js";
 import { formatTimestamp } from "./utils.js";
 
-const EMPTY_MESSAGE = "No captures yet.";
+const EMPTY_MESSAGE =
+  "No captures yet. Start the camera, then take a picture or record a video.";
 
 export function initGallery(root = document) {
   const container = root.querySelector("#gallery");

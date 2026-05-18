@@ -52,7 +52,7 @@ describe("gallery rendering", () => {
     renderGallery(container, []);
 
     expect(container.querySelector(".empty-state")?.textContent).toBe(
-      "No captures yet.",
+      "No captures yet. Start the camera, then take a picture or record a video.",
     );
     expect(container.querySelectorAll(".gallery-card")).toHaveLength(0);
   });
@@ -117,7 +117,7 @@ describe("gallery rendering", () => {
     expect(listItems()).toEqual([]);
     expect(document.querySelector("#clear-gallery").disabled).toBe(true);
     expect(document.querySelector(".empty-state")?.textContent).toBe(
-      "No captures yet.",
+      "No captures yet. Start the camera, then take a picture or record a video.",
     );
   });
 
@@ -159,7 +159,7 @@ describe("gallery rendering", () => {
 
     expect(listItems()).toEqual([]);
     expect(document.querySelector(".empty-state")?.textContent).toBe(
-      "No captures yet.",
+      "No captures yet. Start the camera, then take a picture or record a video.",
     );
   });
 
