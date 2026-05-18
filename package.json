@@ -7,6 +7,7 @@
     "dev": "node scripts/dev-server.js",
     "test:e2e": "playwright test",
     "test": "vitest run",
+    "verify:prod": "node scripts/verify-production.js",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{html,css,js,json,md}\""
   },

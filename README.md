@@ -62,7 +62,14 @@ Run validation:
 ```bash
 npm run lint
 npm test
+npm run test:e2e
 npm run format
+```
+
+Run the production HTTPS smoke check:
+
+```bash
+npm run verify:prod
 ```
 
 For manual device coverage, use `docs/manual-cross-device-checklist.md`. For the
@@ -86,42 +93,81 @@ to keep and clear old local items when storage fills up.
 
 ## Deployment
 
-This app is static. Deploy the repository root as the published directory and ensure the
-final URL uses HTTPS.
+This app is static. There is no bundling step: deploy the repository root as the
+published directory and ensure the final URL uses HTTPS. Before deploying, run:
+
+```bash
+npm ci
+npm run lint
+npm test
+npm run test:e2e
+npm run verify:prod
+```
 
 ### GitHub Pages
 
-1. Push the app to the repository default branch.
-2. In repository settings, enable Pages.
-3. Set the source to the default branch and the repository root.
-4. Use the generated `https://<owner>.github.io/<repo>/` URL.
+```bash
+git push origin main
+gh api \
+  --method POST \
+  /repos/<owner>/<repo>/pages \
+  -f source.branch=main \
+  -f source.path=/
+```
+
+If Pages already exists, update it instead:
+
+```bash
+gh api \
+  --method PUT \
+  /repos/<owner>/<repo>/pages \
+  -f source.branch=main \
+  -f source.path=/
+```
+
+Use the generated `https://<owner>.github.io/<repo>/` URL.
 
 ### Cloudflare Pages
 
-1. Create a Pages project from the GitHub repository.
-2. Set the framework preset to `None`.
-3. Leave the build command empty.
-4. Set the output directory to `/` or the repository root.
-5. Deploy and use the generated HTTPS Pages URL.
+```bash
+npx wrangler pages deploy . \
+  --project-name zeroclaw-camera-capture \
+  --branch main
+```
+
+In the Cloudflare dashboard, keep the build command empty and the output directory as
+the repository root.
 
 ### Netlify
 
-1. Create a site from the GitHub repository.
-2. Leave the build command empty.
-3. Set the publish directory to `.`.
-4. Deploy and use the generated HTTPS Netlify URL or a custom HTTPS domain.
+```bash
+npx netlify deploy --prod --dir .
+```
+
+For linked Git repositories, leave the build command empty and set the publish directory
+to `.`.
 
 ### Vercel
 
-1. Import the GitHub repository.
-2. Select `Other` as the framework preset.
-3. Leave the build command empty.
-4. Set the output directory to `.`.
-5. Deploy and use the generated HTTPS Vercel URL or a custom HTTPS domain.
+```bash
+npx vercel --prod
+```
+
+Use the `Other` framework preset, leave the build command empty, and set the output
+directory to `.`.
 
 ### Self-Hosted nginx
 
 Copy the repository files to a web root and serve them over TLS:
+
+```bash
+rsync -av \
+  --exclude .git \
+  --exclude node_modules \
+  --exclude test-results \
+  --exclude playwright-report \
+  ./ deploy@camera.example.com:/var/www/zeroclaw/
+```
 
 ```nginx
 server {
@@ -140,4 +186,42 @@ server {
 }
 ```
 
+Enable the site and reload nginx:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/zeroclaw /etc/nginx/sites-enabled/zeroclaw
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
 Redirect port 80 to HTTPS if the host accepts plain HTTP traffic.
+
+### Self-Hosted Caddy
+
+Copy the files:
+
+```bash
+rsync -av \
+  --exclude .git \
+  --exclude node_modules \
+  --exclude test-results \
+  --exclude playwright-report \
+  ./ deploy@camera.example.com:/var/www/zeroclaw/
+```
+
+Use this Caddyfile:
+
+```caddyfile
+camera.example.com {
+  root * /var/www/zeroclaw
+  file_server
+  encode zstd gzip
+}
+```
+
+Reload Caddy:
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
