@@ -1,7 +1,22 @@
+import {
+  getMediaDevicesErrorMessage,
+  MISSING_GET_USER_MEDIA_ERROR,
+  MISSING_MEDIA_DEVICES_ERROR,
+} from "./errors.js";
+
 let activeStream = null;
 let activeVideoEl = null;
 let activeFacingMode = null;
 let activeDeviceId = null;
+const detectedCapabilities = detectCapabilities();
+
+export function capabilities() {
+  return {
+    ...detectedCapabilities,
+    guidance: [...detectedCapabilities.guidance],
+    missing: [...detectedCapabilities.missing],
+  };
+}
 
 export async function startCamera({ videoEl, facingMode } = {}) {
   return startCameraWithVideo({
@@ -180,4 +195,49 @@ function assertMediaDevicesAvailable() {
   ) {
     throw new Error("Camera access is not supported in this browser.");
   }
+}
+
+function detectCapabilities() {
+  const isSecureContext =
+    typeof window !== "undefined" && window.isSecureContext === true;
+  const hasMediaDevices =
+    typeof navigator !== "undefined" && Boolean(navigator.mediaDevices);
+  const hasGetUserMedia =
+    hasMediaDevices && typeof navigator.mediaDevices.getUserMedia === "function";
+  const hasMediaRecorder =
+    typeof window !== "undefined" && typeof window.MediaRecorder === "function";
+  const canUseCamera = isSecureContext && hasGetUserMedia;
+  const canRecordVideo = canUseCamera && hasMediaRecorder;
+  const missing = [];
+  const guidance = [];
+
+  if (!isSecureContext) {
+    missing.push("secure-context");
+    guidance.push(getMediaDevicesErrorMessage("SecurityError"));
+  }
+
+  if (!hasMediaDevices) {
+    missing.push("media-devices");
+    guidance.push(getMediaDevicesErrorMessage(MISSING_MEDIA_DEVICES_ERROR));
+  } else if (!hasGetUserMedia) {
+    missing.push("get-user-media");
+    guidance.push(getMediaDevicesErrorMessage(MISSING_GET_USER_MEDIA_ERROR));
+  }
+
+  if (!hasMediaRecorder) {
+    missing.push("media-recorder");
+    guidance.push("Video recording is not supported in this browser.");
+  }
+
+  return {
+    canRecordVideo,
+    canUseCamera,
+    guidance,
+    hasGetUserMedia,
+    hasMediaDevices,
+    hasMediaRecorder,
+    isSecureContext,
+    missing,
+    supported: canRecordVideo,
+  };
 }
