@@ -3,6 +3,7 @@ import { formatTimestamp } from "./utils.js";
 
 const EMPTY_MESSAGE =
   "No captures yet. Start the camera, then take a picture or record a video.";
+const galleryObjectUrls = new WeakMap();
 
 export function initGallery(root = document) {
   const container = root.querySelector("#gallery");
@@ -18,7 +19,7 @@ export function initGallery(root = document) {
 
   if (clearButton) {
     clearButton.addEventListener("click", () => {
-      handleClearAll(clearButton);
+      handleClearAll(clearButton, { container });
     });
   }
 
@@ -28,6 +29,7 @@ export function initGallery(root = document) {
     window.addEventListener(STORAGE_CHANGED_EVENT, render);
     return () => {
       window.removeEventListener(STORAGE_CHANGED_EVENT, render);
+      revokeGalleryObjectUrls(container);
     };
   }
 
@@ -40,8 +42,15 @@ export function renderGallery(
   { clearButton = null } = {},
 ) {
   assertContainer(container);
+  revokeGalleryObjectUrls(container);
   setClearButtonState(clearButton, items);
   container.replaceChildren();
+
+  const objectUrls = new Set();
+  galleryObjectUrls.set(container, objectUrls);
+  const registerObjectUrl = (url) => {
+    objectUrls.add(url);
+  };
 
   if (items.length === 0) {
     container.append(createEmptyState());
@@ -50,13 +59,13 @@ export function renderGallery(
 
   const fragment = document.createDocumentFragment();
   for (const item of items) {
-    fragment.append(createGalleryCard(item));
+    fragment.append(createGalleryCard(item, { registerObjectUrl }));
   }
 
   container.append(fragment);
 }
 
-export function handleClearAll(clearButton = null) {
+export function handleClearAll(clearButton = null, { container = null } = {}) {
   const items = listItems();
   setClearButtonState(clearButton, items);
 
@@ -68,18 +77,28 @@ export function handleClearAll(clearButton = null) {
     return false;
   }
 
+  if (container) {
+    revokeGalleryObjectUrls(container);
+  }
+
   clearAll();
   return true;
 }
 
-function createGalleryCard(item) {
+function createGalleryCard(item, { registerObjectUrl = noop } = {}) {
   const card = document.createElement("article");
   card.className = "gallery-card";
   card.setAttribute("aria-label", createCardLabel(item));
+  const cardObjectUrls = new Set();
+  const trackObjectUrl = (url) => {
+    cardObjectUrls.add(url);
+    registerObjectUrl(url);
+  };
+  const mediaResource = createMediaResource(item, trackObjectUrl);
 
   const media = document.createElement("div");
   media.className = "gallery-card__media";
-  media.append(createMediaElement(item));
+  media.append(createMediaElement(item, mediaResource));
   const beautyBadge = createBeautyBadge(item);
   if (beautyBadge) {
     media.append(beautyBadge);
@@ -97,21 +116,30 @@ function createGalleryCard(item) {
   createdAt.dateTime = item.createdAt;
   createdAt.textContent = formatItemTimestamp(item.createdAt);
 
-  meta.append(type, createdAt, createActions(item));
+  meta.append(
+    type,
+    createdAt,
+    createActions(item, {
+      mediaResource,
+      onBeforeDelete: () => {
+        revokeObjectUrlSet(cardObjectUrls);
+      },
+    }),
+  );
   card.append(media, meta);
 
   return card;
 }
 
-function createActions(item) {
+function createActions(item, { mediaResource, onBeforeDelete = noop } = {}) {
   const actions = document.createElement("div");
   actions.className = "gallery-card__actions";
 
   const download = document.createElement("a");
   download.className = "gallery-card__download";
   download.setAttribute("aria-label", `Download ${formatTypeLabel(item.type)}`);
-  download.download = createDownloadFilename(item);
-  download.href = item.data;
+  download.download = createDownloadFilename(item, mediaResource);
+  download.href = mediaResource?.url || item.data;
   download.textContent = "Download";
 
   const remove = document.createElement("button");
@@ -121,6 +149,7 @@ function createActions(item) {
   remove.textContent = "Delete";
   remove.addEventListener("click", () => {
     if (confirmDelete()) {
+      onBeforeDelete();
       removeItem(item.id);
     }
   });
@@ -129,13 +158,13 @@ function createActions(item) {
   return actions;
 }
 
-function createMediaElement(item) {
+function createMediaElement(item, mediaResource = createMediaResource(item)) {
   if (item.type === "picture") {
     const image = document.createElement("img");
     image.alt = "Captured picture";
     image.decoding = "async";
     image.loading = "lazy";
-    image.src = item.data;
+    image.src = mediaResource.url;
     return image;
   }
 
@@ -144,7 +173,7 @@ function createMediaElement(item) {
     video.controls = true;
     video.playsInline = true;
     video.preload = "metadata";
-    video.src = item.data;
+    video.src = mediaResource.url;
     video.setAttribute("aria-label", "Captured video");
     return video;
   }
@@ -153,6 +182,81 @@ function createMediaElement(item) {
   unsupported.className = "gallery-card__unsupported";
   unsupported.textContent = "Unsupported capture";
   return unsupported;
+}
+
+function createMediaResource(item, registerObjectUrl = noop) {
+  if (item.type !== "video") {
+    return {
+      mimeType: getDataUrlMimeType(item.data),
+      url: item.data,
+    };
+  }
+
+  const blobResource = createVideoBlobResource(item.data);
+  if (!blobResource) {
+    return {
+      mimeType: getDataUrlMimeType(item.data),
+      url: item.data,
+    };
+  }
+
+  registerObjectUrl(blobResource.url);
+  return blobResource;
+}
+
+function createVideoBlobResource(dataUrl) {
+  const parsedDataUrl = parseBase64DataUrl(dataUrl);
+  if (!parsedDataUrl || !canCreateObjectUrl()) {
+    return null;
+  }
+
+  try {
+    const blob = new Blob([parsedDataUrl.bytes], { type: parsedDataUrl.mimeType });
+    return {
+      mimeType: parsedDataUrl.mimeType,
+      url: URL.createObjectURL(blob),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseBase64DataUrl(dataUrl) {
+  if (typeof dataUrl !== "string") {
+    return null;
+  }
+
+  const match = /^data:([^,]+),(.*)$/s.exec(dataUrl);
+  if (!match) {
+    return null;
+  }
+
+  const metadata = match[1];
+  const metadataParts = metadata.split(";").map((part) => part.trim());
+  if (!metadataParts.some((part) => part.toLowerCase() === "base64")) {
+    return null;
+  }
+
+  const mimeType = metadataParts[0]?.toLowerCase();
+  if (!mimeType) {
+    return null;
+  }
+
+  try {
+    if (typeof globalThis.atob !== "function") {
+      return null;
+    }
+
+    const binaryString = globalThis.atob(match[2].replace(/\s/g, ""));
+    const bytes = new Uint8Array(binaryString.length);
+    for (let index = 0; index < binaryString.length; index += 1) {
+      bytes[index] = binaryString.charCodeAt(index);
+    }
+
+    return { bytes, mimeType };
+  } catch {
+    return null;
+  }
 }
 
 function createBeautyBadge(item) {
@@ -205,12 +309,14 @@ function formatItemTimestamp(createdAt) {
   }
 }
 
-function createDownloadFilename(item) {
-  return `snapvault-${item.id}.${getFileExtension(item)}`;
+function createDownloadFilename(item, mediaResource = null) {
+  return `snapvault-${item.id}.${getFileExtension(item, mediaResource)}`;
 }
 
-function getFileExtension(item) {
-  const mimeType = getDataUrlMimeType(item.data);
+function getFileExtension(item, mediaResource = null) {
+  const mimeType = normalizeMimeType(
+    mediaResource?.mimeType || getDataUrlMimeType(item.data),
+  );
 
   if (mimeType === "image/jpeg") {
     return "jpg";
@@ -246,6 +352,43 @@ function getFileExtension(item) {
 function getDataUrlMimeType(dataUrl) {
   const match = /^data:([^;,]+)/.exec(dataUrl);
   return match ? match[1].toLowerCase() : "";
+}
+
+function normalizeMimeType(mimeType) {
+  return String(mimeType || "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+}
+
+function canCreateObjectUrl() {
+  return (
+    typeof Blob === "function" &&
+    typeof URL !== "undefined" &&
+    typeof URL.createObjectURL === "function"
+  );
+}
+
+function revokeGalleryObjectUrls(container) {
+  const objectUrls = galleryObjectUrls.get(container);
+  if (!objectUrls) {
+    return;
+  }
+
+  revokeObjectUrlSet(objectUrls);
+  galleryObjectUrls.delete(container);
+}
+
+function revokeObjectUrlSet(objectUrls) {
+  for (const objectUrl of objectUrls) {
+    try {
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // Ignore revoke failures so cleanup never blocks gallery updates.
+    }
+  }
+
+  objectUrls.clear();
 }
 
 function normalizeBeautyLevel(value) {
