@@ -82,6 +82,9 @@ describe("record button UI wiring", () => {
     recordButton.click();
     expect(stopRecording).toHaveBeenCalledTimes(1);
     expect(recordVideo).toHaveBeenCalledTimes(1);
+    expect(recordButton.textContent).toBe("Stop");
+    expect(recordButton.getAttribute("aria-pressed")).toBe("true");
+    expect(indicator.hidden).toBe(false);
 
     finishRecording({
       dataUrl: "data:video/webm;base64,AAAA",
