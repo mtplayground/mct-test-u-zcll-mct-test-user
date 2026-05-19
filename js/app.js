@@ -1,6 +1,7 @@
 import { getStream, startCamera, stopCamera, switchCamera } from "./camera.js";
 import { capturePicture, recordVideo } from "./capture.js";
 import { getMediaDevicesErrorMessage } from "./errors.js";
+import { filterSpec } from "./filter.js";
 import { initGallery } from "./gallery.js";
 import { addItem } from "./storage.js";
 import { initStatusEvents, showStatus } from "./ui.js";
@@ -29,6 +30,7 @@ export function initApp(root = document) {
   const videoEl = root.querySelector("#camera-preview");
   const beautyControls = {
     output: root.querySelector("#beauty-level-value"),
+    preview: videoEl,
     resetButton: root.querySelector("#reset-beauty-level"),
     slider: root.querySelector("#beauty-level"),
   };
@@ -80,7 +82,12 @@ export function initApp(root = document) {
   }
 }
 
-export function initBeautyControls({ output = null, resetButton = null, slider = null } = {}) {
+export function initBeautyControls({
+  output = null,
+  preview = null,
+  resetButton = null,
+  slider = null,
+} = {}) {
   if (!slider) {
     return;
   }
@@ -95,6 +102,8 @@ export function initBeautyControls({ output = null, resetButton = null, slider =
       output.value = String(beautyLevel);
       output.textContent = String(beautyLevel);
     }
+
+    applyPreviewFilter(preview, beautyLevel);
 
     if (persist) {
       saveBeautyLevel(beautyLevel);
@@ -435,6 +444,14 @@ function normalizeBeautyLevel(value) {
   }
 
   return Math.min(100, Math.max(0, Math.round(numberValue)));
+}
+
+function applyPreviewFilter(videoEl, beautyLevel) {
+  if (!videoEl?.style) {
+    return;
+  }
+
+  videoEl.style.filter = filterSpec(beautyLevel).cssFilter;
 }
 
 function noop() {
