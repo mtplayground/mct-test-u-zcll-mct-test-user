@@ -11,8 +11,9 @@ describe("record button UI wiring", () => {
     vi.restoreAllMocks();
   });
 
-  it("records from the active stream, disables the button, shows countdown, and saves a video item", async () => {
+  it("records from the active stream, turns Record into Stop, and saves a video item", async () => {
     let finishRecording;
+    const stopRecording = vi.fn();
     const stream = { getTracks: vi.fn(() => []) };
     const recordVideo = vi.fn(
       () =>
@@ -60,14 +61,27 @@ describe("record button UI wiring", () => {
     recordButton.click();
     await Promise.resolve();
 
-    expect(recordVideo).toHaveBeenCalledWith(stream, { maxSeconds: 15 });
-    expect(recordButton.disabled).toBe(true);
+    expect(recordVideo).toHaveBeenCalledWith(stream, {
+      maxSeconds: 15,
+      onStart: expect.any(Function),
+    });
+    recordVideo.mock.calls[0][1].onStart({ stop: stopRecording });
+
+    expect(recordButton.disabled).toBe(false);
+    expect(recordButton.textContent).toBe("Stop");
+    expect(recordButton.getAttribute("aria-label")).toBe("Stop recording");
+    expect(recordButton.getAttribute("aria-pressed")).toBe("true");
+    expect(recordButton.classList.contains("record-button--active")).toBe(true);
     expect(document.querySelector("#start-camera").disabled).toBe(true);
     expect(document.querySelector("#stop-camera").disabled).toBe(true);
     expect(document.querySelector("#switch-camera").disabled).toBe(true);
     expect(document.querySelector("#take-picture").disabled).toBe(true);
     expect(indicator.hidden).toBe(false);
     expect(countdown.textContent).toBe("00:15");
+
+    recordButton.click();
+    expect(stopRecording).toHaveBeenCalledTimes(1);
+    expect(recordVideo).toHaveBeenCalledTimes(1);
 
     finishRecording({
       dataUrl: "data:video/webm;base64,AAAA",
@@ -86,11 +100,16 @@ describe("record button UI wiring", () => {
     });
 
     expect(recordButton.disabled).toBe(false);
+    expect(recordButton.textContent).toBe("Record");
+    expect(recordButton.getAttribute("aria-label")).toBe("Record");
+    expect(recordButton.getAttribute("aria-pressed")).toBe("false");
+    expect(recordButton.classList.contains("record-button--active")).toBe(false);
     expect(document.querySelector("#start-camera").disabled).toBe(true);
     expect(document.querySelector("#stop-camera").disabled).toBe(false);
     expect(document.querySelector("#switch-camera").disabled).toBe(false);
     expect(document.querySelector("#take-picture").disabled).toBe(false);
     expect(indicator.hidden).toBe(true);
+    expect(countdown.textContent).toBe("");
     expect(document.querySelector(".toast--success")?.textContent).toBe("Video saved.");
   });
 

@@ -64,6 +64,16 @@ button:focus-visible {
   outline-offset: 2px;
 }
 
+.record-button--active {
+  background: #e12d39;
+  border-color: #b9232d;
+  color: #ffffff;
+}
+
+.record-button--active:hover {
+  border-color: #8f1d25;
+}
+
 a:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
   outline-offset: 2px;

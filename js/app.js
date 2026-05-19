@@ -8,8 +8,10 @@ import { newId } from "./utils.js";
 
 const DEFAULT_RECORDING_SECONDS = 15;
 const DEFAULT_FACING_MODE = "environment";
+const RECORD_BUTTON_ACTIVE_CLASS = "record-button--active";
 let isRecording = false;
 let isCameraBusy = false;
+let currentRecordingStop = null;
 
 initApp();
 
@@ -145,6 +147,7 @@ export async function handleRecordVideo({
   recordButton = null,
 } = {}) {
   if (isRecording) {
+    currentRecordingStop?.();
     return;
   }
 
@@ -154,12 +157,20 @@ export async function handleRecordVideo({
     return;
   }
 
-  setRecordButtonDisabled(recordButton, true);
+  setRecordButtonRecording(recordButton, false);
   updateControlState(controls, { recording: true });
 
   try {
     const recording = await runRecordingTask(
-      ({ maxSeconds }) => recordVideo(stream, { maxSeconds }),
+      ({ maxSeconds }) =>
+        recordVideo(stream, {
+          maxSeconds,
+          onStart: ({ stop }) => {
+            currentRecordingStop = stop;
+            setRecordButtonRecording(recordButton, true);
+            updateControlState(controls, { recording: true });
+          },
+        }),
       {
         maxSeconds: DEFAULT_RECORDING_SECONDS,
         tick: (secondsLeft) => {
@@ -179,8 +190,9 @@ export async function handleRecordVideo({
   } catch (error) {
     showStatus("error", getErrorMessage(error, "Could not save video."));
   } finally {
-    hideRecordingIndicator(indicatorEl);
-    setRecordButtonDisabled(recordButton, false);
+    currentRecordingStop = null;
+    hideRecordingIndicator(indicatorEl, countdownEl);
+    setRecordButtonRecording(recordButton, false);
     updateControlState(controls);
   }
 }
@@ -262,7 +274,7 @@ function updateControlState(controls = {}, override = {}) {
   setDisabled(controls.stopCameraButton, !cameraActive || disableCameraActions);
   setDisabled(controls.switchCameraButton, !cameraActive || disableCameraActions);
   setDisabled(controls.takePictureButton, !cameraActive || disableCameraActions);
-  setDisabled(controls.recordVideoButton, !cameraActive || disableCameraActions);
+  setDisabled(controls.recordVideoButton, !cameraActive || busy);
   updateCameraStatus(controls.statusEl, { busy, cameraActive, recording });
 }
 
@@ -300,16 +312,25 @@ function showRecordingIndicator(indicatorEl, countdownEl, secondsLeft) {
   }
 }
 
-function hideRecordingIndicator(indicatorEl) {
+function hideRecordingIndicator(indicatorEl, countdownEl = null) {
   if (indicatorEl) {
     indicatorEl.hidden = true;
   }
+
+  if (countdownEl) {
+    countdownEl.textContent = "";
+  }
 }
 
-function setRecordButtonDisabled(recordButton, disabled) {
-  if (recordButton) {
-    recordButton.disabled = disabled;
+function setRecordButtonRecording(recordButton, recording) {
+  if (!recordButton) {
+    return;
   }
+
+  recordButton.textContent = recording ? "Stop" : "Record";
+  recordButton.setAttribute("aria-label", recording ? "Stop recording" : "Record");
+  recordButton.setAttribute("aria-pressed", recording ? "true" : "false");
+  recordButton.classList.toggle(RECORD_BUTTON_ACTIVE_CLASS, recording);
 }
 
 function startCountdownTicker(maxSeconds, tick) {
