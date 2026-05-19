@@ -9,11 +9,14 @@ describe("gallery rendering", () => {
     localStorage.clear();
     delete window.confirm;
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("renders picture and video cards with media, type labels, and timestamps", () => {
+    const { createObjectURL } = stubObjectUrls(["blob:video-1"]);
     const container = document.createElement("div");
     container.id = "gallery";
+    const videoDataUrl = "data:video/webm;base64,dmllbw==";
 
     renderGallery(container, [
       {
@@ -26,7 +29,7 @@ describe("gallery rendering", () => {
       {
         beautyLevel: 0,
         createdAt: "2026-05-18T12:05:00.000Z",
-        data: "data:video/webm;base64,video",
+        data: videoDataUrl,
         duration: 15,
         id: "video-1",
         type: "video",
@@ -53,14 +56,22 @@ describe("gallery rendering", () => {
 
     const video = cards[1].querySelector("video");
     expect(video?.controls).toBe(true);
-    expect(video?.src).toBe("data:video/webm;base64,video");
+    expect(video?.src).toBe("blob:video-1");
+    expect(video?.src.startsWith("blob:")).toBe(true);
+    expect(video?.src.startsWith("data:")).toBe(false);
     expect(cards[1].querySelector(".gallery-card__type")?.textContent).toBe("Video");
     expect(cards[1].querySelector("time")?.dateTime).toBe("2026-05-18T12:05:00.000Z");
     expect(cards[1].querySelector("a")?.download).toBe("snapvault-video-1.webm");
     expect(cards[1].querySelector("a")?.getAttribute("aria-label")).toBe(
       "Download Video",
     );
+    expect(cards[1].querySelector("a")?.href).toBe("blob:video-1");
+    expect(cards[1].querySelector("a")?.href.startsWith("data:")).toBe(false);
     expect(cards[1].querySelector(".gallery-card__beauty-badge")).toBeNull();
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+    const createdBlob = createObjectURL.mock.calls[0][0];
+    expect(createdBlob).toBeInstanceOf(Blob);
+    expect(createdBlob.type).toBe("video/webm");
   });
 
   it("omits the beauty badge for missing, invalid, and zero levels", () => {
@@ -133,6 +144,35 @@ describe("gallery rendering", () => {
     });
 
     expect(document.querySelectorAll(".gallery-card")).toHaveLength(1);
+  });
+
+  it("revokes a video blob URL before re-rendering the gallery", () => {
+    const { createObjectURL, revokeObjectURL } = stubObjectUrls([
+      "blob:video-first",
+      "blob:video-second",
+    ]);
+    const container = document.createElement("div");
+    const item = {
+      createdAt: "2026-05-18T12:00:00.000Z",
+      data: "data:video/mp4;base64,dmllbw==",
+      id: "video-1",
+      type: "video",
+    };
+
+    renderGallery(container, [item]);
+
+    expect(container.querySelector("video")?.src).toBe("blob:video-first");
+    expect(container.querySelector("a")?.href).toBe("blob:video-first");
+    expect(createObjectURL).toHaveBeenCalledTimes(1);
+
+    renderGallery(container, [item]);
+
+    expect(revokeObjectURL).toHaveBeenCalledWith("blob:video-first");
+    expect(container.querySelector("video")?.src).toBe("blob:video-second");
+    expect(container.querySelector("a")?.href).toBe("blob:video-second");
+    expect(createObjectURL).toHaveBeenCalledTimes(2);
+    expect(createObjectURL.mock.calls[1][0]).toBeInstanceOf(Blob);
+    expect(createObjectURL.mock.calls[1][0].type).toBe("video/mp4");
   });
 
   it("clears all captures after confirmation and disables the header button", () => {
@@ -208,6 +248,31 @@ describe("gallery rendering", () => {
     );
   });
 
+  it("revokes a video blob URL when deleting a video capture", () => {
+    const { revokeObjectURL } = stubObjectUrls();
+    document.body.innerHTML = `<div id="gallery"></div>`;
+    window.confirm = vi.fn(() => true);
+
+    initGallery(document);
+    addItem({
+      createdAt: "2026-05-18T12:00:00.000Z",
+      data: "data:video/webm;base64,dmllbw==",
+      id: "video-1",
+      type: "video",
+    });
+
+    const videoUrl = document.querySelector("video")?.src;
+    expect(videoUrl?.startsWith("blob:")).toBe(true);
+
+    document.querySelector(".gallery-card__delete").click();
+
+    expect(revokeObjectURL).toHaveBeenCalledWith(videoUrl);
+    expect(listItems()).toEqual([]);
+    expect(document.querySelector(".empty-state")?.textContent).toBe(
+      "No captures yet. Start the camera, then take a picture or record a video.",
+    );
+  });
+
   it("keeps a capture when deletion is cancelled", () => {
     document.body.innerHTML = `<div id="gallery"></div>`;
     window.confirm = vi.fn(() => false);
@@ -227,3 +292,25 @@ describe("gallery rendering", () => {
     expect(document.querySelector("a")?.download).toBe("snapvault-picture-1.png");
   });
 });
+
+function stubObjectUrls(urls = []) {
+  const queue = [...urls];
+  let generatedUrlIndex = 0;
+  const createObjectURL = vi.fn(
+    () => queue.shift() || `blob:generated-video-${(generatedUrlIndex += 1)}`,
+  );
+  const revokeObjectURL = vi.fn();
+  const URLWithObjectUrls = Object.create(globalThis.URL);
+
+  Object.defineProperty(URLWithObjectUrls, "createObjectURL", {
+    configurable: true,
+    value: createObjectURL,
+  });
+  Object.defineProperty(URLWithObjectUrls, "revokeObjectURL", {
+    configurable: true,
+    value: revokeObjectURL,
+  });
+  vi.stubGlobal("URL", URLWithObjectUrls);
+
+  return { createObjectURL, revokeObjectURL };
+}
