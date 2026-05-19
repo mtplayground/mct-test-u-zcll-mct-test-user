@@ -9,6 +9,7 @@ import { newId } from "./utils.js";
 const DEFAULT_RECORDING_SECONDS = 15;
 const DEFAULT_FACING_MODE = "environment";
 const RECORD_BUTTON_ACTIVE_CLASS = "record-button--active";
+const BEAUTY_LEVEL_STORAGE_KEY = "snapvault:v2:beauty-level";
 let isRecording = false;
 let isCameraBusy = false;
 let currentRecordingStop = null;
@@ -26,6 +27,11 @@ export function initApp(root = document) {
   const switchCameraButton = root.querySelector("#switch-camera");
   const statusEl = root.querySelector("#camera-status");
   const videoEl = root.querySelector("#camera-preview");
+  const beautyControls = {
+    output: root.querySelector("#beauty-level-value"),
+    resetButton: root.querySelector("#reset-beauty-level"),
+    slider: root.querySelector("#beauty-level"),
+  };
   const controls = {
     recordVideoButton,
     startCameraButton,
@@ -36,6 +42,7 @@ export function initApp(root = document) {
   };
 
   updateControlState(controls);
+  initBeautyControls(beautyControls);
 
   if (startCameraButton && videoEl) {
     startCameraButton.addEventListener("click", () => {
@@ -69,6 +76,41 @@ export function initApp(root = document) {
         indicatorEl: root.querySelector("#recording-indicator"),
         recordButton: recordVideoButton,
       });
+    });
+  }
+}
+
+export function initBeautyControls({ output = null, resetButton = null, slider = null } = {}) {
+  if (!slider) {
+    return;
+  }
+
+  const setBeautyLevel = (value, { persist = true } = {}) => {
+    const beautyLevel = normalizeBeautyLevel(value);
+
+    slider.value = String(beautyLevel);
+    slider.setAttribute("aria-valuetext", String(beautyLevel));
+
+    if (output) {
+      output.value = String(beautyLevel);
+      output.textContent = String(beautyLevel);
+    }
+
+    if (persist) {
+      saveBeautyLevel(beautyLevel);
+    }
+  };
+
+  setBeautyLevel(readStoredBeautyLevel(), { persist: false });
+
+  slider.addEventListener("input", () => {
+    setBeautyLevel(slider.value);
+  });
+
+  if (resetButton) {
+    resetButton.addEventListener("click", () => {
+      setBeautyLevel(0);
+      slider.focus();
     });
   }
 }
@@ -367,6 +409,32 @@ function normalizeRecordingSeconds(value) {
   }
 
   return value;
+}
+
+function readStoredBeautyLevel() {
+  try {
+    return normalizeBeautyLevel(localStorage.getItem(BEAUTY_LEVEL_STORAGE_KEY));
+  } catch {
+    return 0;
+  }
+}
+
+function saveBeautyLevel(beautyLevel) {
+  try {
+    localStorage.setItem(BEAUTY_LEVEL_STORAGE_KEY, String(beautyLevel));
+  } catch {
+    showStatus("warning", "Beauty level could not be saved.", { autoDismiss: true });
+  }
+}
+
+function normalizeBeautyLevel(value) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(numberValue)));
 }
 
 function noop() {
