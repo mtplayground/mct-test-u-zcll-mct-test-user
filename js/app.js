@@ -77,6 +77,7 @@ export function initApp(root = document) {
       handleRecordVideo({
         countdownEl: root.querySelector("#recording-countdown"),
         controls,
+        getBeautyLevel: () => getSliderBeautyLevel(beautyControls.slider),
         indicatorEl: root.querySelector("#recording-indicator"),
         recordButton: recordVideoButton,
       });
@@ -196,6 +197,7 @@ export function isCurrentlyRecording() {
 export async function handleRecordVideo({
   controls = {},
   countdownEl = null,
+  getBeautyLevel = () => 0,
   indicatorEl = null,
   recordButton = null,
 } = {}) {
@@ -217,6 +219,7 @@ export async function handleRecordVideo({
     const recording = await runRecordingTask(
       ({ maxSeconds }) =>
         recordVideo(stream, {
+          getBeautyLevel,
           maxSeconds,
           onStart: ({ stop }) => {
             currentRecordingStop = stop;

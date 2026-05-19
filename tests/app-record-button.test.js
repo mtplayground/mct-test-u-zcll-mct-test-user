@@ -62,9 +62,11 @@ describe("record button UI wiring", () => {
     await Promise.resolve();
 
     expect(recordVideo).toHaveBeenCalledWith(stream, {
+      getBeautyLevel: expect.any(Function),
       maxSeconds: 15,
       onStart: expect.any(Function),
     });
+    expect(recordVideo.mock.calls[0][1].getBeautyLevel()).toBe(0);
     recordVideo.mock.calls[0][1].onStart({ stop: stopRecording });
 
     expect(recordButton.disabled).toBe(false);

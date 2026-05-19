@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { recordVideo } from "../js/capture.js";
+import * as filterPipeline from "../js/filter.js";
 
 describe("recordVideo", () => {
   let originalFileReader;
   let originalMediaRecorder;
+  let originalMediaStream;
+  let originalRequestAnimationFrame;
+  let originalCancelAnimationFrame;
   let fileReaderBlobs;
   let recorderInstances;
 
@@ -16,12 +20,18 @@ describe("recordVideo", () => {
     recorderInstances = [];
     originalFileReader = globalThis.FileReader;
     originalMediaRecorder = globalThis.MediaRecorder;
+    originalMediaStream = window.MediaStream;
+    originalRequestAnimationFrame = window.requestAnimationFrame;
+    originalCancelAnimationFrame = window.cancelAnimationFrame;
   });
 
   afterEach(() => {
     vi.useRealTimers();
     globalThis.FileReader = originalFileReader;
     globalThis.MediaRecorder = originalMediaRecorder;
+    window.MediaStream = originalMediaStream;
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+    window.cancelAnimationFrame = originalCancelAnimationFrame;
     vi.restoreAllMocks();
   });
 
@@ -139,6 +149,85 @@ describe("recordVideo", () => {
     expect(fileReaderBlobs).toHaveLength(1);
   });
 
+  it("records the raw stream when the beauty level starts at 0", async () => {
+    globalThis.FileReader = createFileReaderStub(fileReaderBlobs);
+    globalThis.MediaRecorder = createMediaRecorderStub({
+      instances: recorderInstances,
+      isTypeSupported: vi.fn(() => false),
+      onStop: (recorder) => {
+        recorder.emitChunk(new Blob(["raw"], { type: "text/plain" }));
+      },
+    });
+
+    const stream = createStream();
+    const recording = recordVideo(stream, {
+      getBeautyLevel: () => 0,
+      maxSeconds: 1,
+    });
+    const recorder = recorderInstances[0];
+
+    expect(recorder.stream).toBe(stream);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(recording).resolves.toMatchObject({
+      dataUrl: "data:video/webm;base64,cmF3",
+      duration: 1,
+    });
+  });
+
+  it("records a filtered stream when the beauty level starts above 0", async () => {
+    const audioTrack = createTrack("audio");
+    const canvasTrack = createTrack("video");
+    const rafCallbacks = [];
+    const { canvas, video } = mockFilteredDom({ canvasTrack, rafCallbacks });
+    const sourceStream = createStream({
+      audioTracks: [audioTrack],
+      videoTracks: [createTrack("video", { height: 720, width: 1280 })],
+    });
+    const applyToCanvas = vi.spyOn(filterPipeline, "applyToCanvas");
+
+    globalThis.FileReader = createFileReaderStub(fileReaderBlobs);
+    globalThis.MediaRecorder = createMediaRecorderStub({
+      instances: recorderInstances,
+      isTypeSupported: vi.fn(() => false),
+      onStop: (recorder) => {
+        recorder.emitChunk(new Blob(["filtered"], { type: "text/plain" }));
+      },
+    });
+
+    let currentBeautyLevel = 60;
+    const recording = recordVideo(sourceStream, {
+      getBeautyLevel: () => currentBeautyLevel,
+      maxSeconds: 1,
+    });
+    const recorder = recorderInstances[0];
+
+    expect(recorder.stream).not.toBe(sourceStream);
+    expect(recorder.stream.getVideoTracks()).toEqual([canvasTrack]);
+    expect(recorder.stream.getAudioTracks()).toEqual([audioTrack]);
+    expect(canvas.width).toBe(1280);
+    expect(canvas.height).toBe(720);
+    expect(video.srcObject).toBe(sourceStream);
+
+    currentBeautyLevel = 35;
+    rafCallbacks.shift()();
+
+    expect(applyToCanvas).toHaveBeenCalledWith(
+      canvas.context,
+      video,
+      1280,
+      720,
+      35,
+    );
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(recording).resolves.toMatchObject({
+      dataUrl: "data:video/webm;base64,ZmlsdGVyZWQ=",
+      duration: 1,
+    });
+    expect(canvasTrack.stop).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects an invalid stream before creating a recorder", async () => {
     const Recorder = createMediaRecorderStub({
       instances: recorderInstances,
@@ -205,8 +294,100 @@ function createFileReaderStub(blobs) {
   };
 }
 
-function createStream() {
+function createStream({ audioTracks = [], tracks, videoTracks = [] } = {}) {
+  const allTracks = tracks || [...videoTracks, ...audioTracks];
+
   return {
-    getTracks: vi.fn(() => []),
+    getAudioTracks: vi.fn(() => audioTracks),
+    getTracks: vi.fn(() => allTracks),
+    getVideoTracks: vi.fn(() => videoTracks),
+  };
+}
+
+function createTrack(kind, settings = {}) {
+  return {
+    getSettings: vi.fn(() => settings),
+    kind,
+    stop: vi.fn(),
+  };
+}
+
+function mockFilteredDom({ canvasTrack, rafCallbacks }) {
+  const originalCreateElement = document.createElement.bind(document);
+  const video = {
+    hidden: false,
+    muted: false,
+    pause: vi.fn(),
+    play: vi.fn(() => Promise.resolve()),
+    playsInline: false,
+    remove: vi.fn(),
+    removeAttribute: vi.fn(),
+    setAttribute: vi.fn(),
+    srcObject: null,
+    style: {},
+    videoHeight: 720,
+    videoWidth: 1280,
+  };
+  const canvas = {
+    captureStream: vi.fn(() =>
+      createStream({
+        tracks: [canvasTrack],
+        videoTracks: [canvasTrack],
+      }),
+    ),
+    context: createContextStub(),
+    getContext: vi.fn(() => canvas.context),
+    height: 0,
+    hidden: false,
+    remove: vi.fn(),
+    setAttribute: vi.fn(),
+    style: {},
+    width: 0,
+  };
+
+  vi.spyOn(document, "createElement").mockImplementation((tagName) => {
+    if (tagName === "video") {
+      return video;
+    }
+
+    if (tagName === "canvas") {
+      return canvas;
+    }
+
+    return originalCreateElement(tagName);
+  });
+  vi.spyOn(document.body, "append").mockImplementation(() => {});
+  window.requestAnimationFrame = vi.fn((callback) => {
+    rafCallbacks.push(callback);
+    return rafCallbacks.length;
+  });
+  window.cancelAnimationFrame = vi.fn();
+  window.MediaStream = class MediaStreamStub {
+    constructor(tracks = []) {
+      this.tracks = tracks;
+    }
+
+    getAudioTracks() {
+      return this.tracks.filter((track) => track.kind === "audio");
+    }
+
+    getTracks() {
+      return this.tracks;
+    }
+
+    getVideoTracks() {
+      return this.tracks.filter((track) => track.kind === "video");
+    }
+  };
+
+  return { canvas, video };
+}
+
+function createContextStub() {
+  return {
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+    restore: vi.fn(),
+    save: vi.fn(),
   };
 }
