@@ -61,6 +61,7 @@ describe("beauty slider UI wiring", () => {
     const videoEl = document.querySelector("#camera-preview");
     expect(capturePicture).toHaveBeenCalledWith(videoEl, { beautyLevel: 46 });
     expect(addItem).toHaveBeenCalledWith({
+      beautyLevel: 46,
       createdAt: expect.any(String),
       data: "data:image/jpeg;base64,captured",
       id: "capture-id",
@@ -87,6 +88,38 @@ describe("beauty slider UI wiring", () => {
       onStart: expect.any(Function),
     });
     expect(recordVideo.mock.calls[0][1].getBeautyLevel()).toBe(72);
+  });
+
+  it("stores the active beauty level with saved videos", async () => {
+    const stream = { getTracks: vi.fn(() => []) };
+    const { addItem } = mockAppModules({
+      recordVideoResult: {
+        dataUrl: "data:video/webm;base64,video",
+        duration: 9,
+        mimeType: "video/webm",
+      },
+      stream,
+    });
+    document.body.innerHTML = `${createBeautyMarkup({ includePreview: true })}
+      <button id="record-video" type="button">Record</button>`;
+
+    await import("../js/app.js");
+
+    const slider = document.querySelector("#beauty-level");
+    slider.value = "73";
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+    document.querySelector("#record-video").click();
+
+    await vi.waitFor(() => {
+      expect(addItem).toHaveBeenCalledWith({
+        beautyLevel: 73,
+        createdAt: expect.any(String),
+        data: "data:video/webm;base64,video",
+        duration: 9,
+        id: "capture-id",
+        type: "video",
+      });
+    });
   });
 
   it("defaults picture capture to level 0 when the slider is missing", async () => {
@@ -165,10 +198,12 @@ describe("beauty slider UI wiring", () => {
   });
 });
 
-function mockAppModules({ stream = null } = {}) {
+function mockAppModules({ recordVideoResult = null, stream = null } = {}) {
   const addItem = vi.fn();
   const capturePicture = vi.fn(() => "data:image/jpeg;base64,captured");
-  const recordVideo = vi.fn(() => new Promise(() => {}));
+  const recordVideo = vi.fn(() =>
+    recordVideoResult ? Promise.resolve(recordVideoResult) : new Promise(() => {}),
+  );
 
   vi.doMock("../js/camera.js", () => ({
     getStream: () => stream,

@@ -7,6 +7,7 @@ const existingItem = {
   type: "photo",
   createdAt: "2026-05-18T19:27:00.000Z",
   data: "data:image/png;base64,existing",
+  beautyLevel: 0,
 };
 
 const oversizedItem = {
@@ -14,6 +15,7 @@ const oversizedItem = {
   type: "photo",
   createdAt: "2026-05-18T19:28:00.000Z",
   data: "data:image/png;base64,oversized",
+  beautyLevel: 0,
 };
 
 describe("storage quota handling", () => {

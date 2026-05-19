@@ -96,6 +96,7 @@ describe("record button UI wiring", () => {
 
     await vi.waitFor(() => {
       expect(addItem).toHaveBeenCalledWith({
+        beautyLevel: 0,
         createdAt: expect.any(String),
         data: "data:video/webm;base64,AAAA",
         duration: 12.25,
