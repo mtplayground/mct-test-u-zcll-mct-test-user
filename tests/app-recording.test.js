@@ -172,6 +172,7 @@ describe("recording state guard and countdown", () => {
 
     const savedItem = addItem.mock.calls[0][0];
     expect(savedItem).toEqual({
+      beautyLevel: 0,
       createdAt: expect.any(String),
       data: "data:video/webm;base64,c2hvcnQtdmlkZW8=",
       duration: 4.25,

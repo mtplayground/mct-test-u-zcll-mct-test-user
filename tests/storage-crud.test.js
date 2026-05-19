@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   addItem,
   clearAll,
+  LEGACY_STORAGE_KEY,
   listItems,
   removeItem,
   SCHEMA_VERSION,
@@ -14,6 +15,7 @@ const photoItem = {
   type: "photo",
   createdAt: "2026-05-18T19:31:00.000Z",
   data: "data:image/png;base64,photo",
+  beautyLevel: 0,
 };
 
 const videoItem = {
@@ -21,6 +23,7 @@ const videoItem = {
   type: "video",
   createdAt: "2026-05-18T19:32:00.000Z",
   data: "data:video/webm;base64,video",
+  beautyLevel: 35,
   duration: 12.5,
 };
 
@@ -99,5 +102,104 @@ describe("storage schema", () => {
     );
 
     expect(listItems()).toEqual([photoItem, videoItem]);
+  });
+
+  it("migrates v1 items to v2 with beautyLevel 0 without deleting v1", () => {
+    const legacyStore = {
+      schemaVersion: 1,
+      items: [
+        {
+          id: "legacy-photo",
+          type: "photo",
+          createdAt: "2026-05-18T20:00:00.000Z",
+          data: "data:image/png;base64,legacy",
+        },
+      ],
+    };
+    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(legacyStore));
+
+    expect(listItems()).toEqual([
+      {
+        ...legacyStore.items[0],
+        beautyLevel: 0,
+      },
+    ]);
+    expect(localStorage.getItem(LEGACY_STORAGE_KEY)).toBe(JSON.stringify(legacyStore));
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual({
+      schemaVersion: SCHEMA_VERSION,
+      items: [
+        {
+          ...legacyStore.items[0],
+          beautyLevel: 0,
+        },
+      ],
+    });
+  });
+
+  it("prefers v2 storage when both v1 and v2 are present", () => {
+    localStorage.setItem(
+      LEGACY_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 1,
+        items: [
+          {
+            id: "legacy-photo",
+            type: "photo",
+            createdAt: "2026-05-18T20:00:00.000Z",
+            data: "data:image/png;base64,legacy",
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: SCHEMA_VERSION,
+        items: [videoItem],
+      }),
+    );
+
+    expect(listItems()).toEqual([videoItem]);
+  });
+
+  it("defaults missing beauty levels to 0 and clamps stored values", () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: SCHEMA_VERSION,
+        items: [
+          {
+            id: "missing-beauty",
+            type: "photo",
+            createdAt: "2026-05-18T20:00:00.000Z",
+            data: "data:image/png;base64,missing",
+          },
+          {
+            id: "high-beauty",
+            type: "photo",
+            createdAt: "2026-05-18T20:01:00.000Z",
+            data: "data:image/png;base64,high",
+            beautyLevel: 140,
+          },
+        ],
+      }),
+    );
+
+    expect(listItems()).toEqual([
+      {
+        id: "missing-beauty",
+        type: "photo",
+        createdAt: "2026-05-18T20:00:00.000Z",
+        data: "data:image/png;base64,missing",
+        beautyLevel: 0,
+      },
+      {
+        id: "high-beauty",
+        type: "photo",
+        createdAt: "2026-05-18T20:01:00.000Z",
+        data: "data:image/png;base64,high",
+        beautyLevel: 100,
+      },
+    ]);
   });
 });

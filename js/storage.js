@@ -1,5 +1,7 @@
-export const STORAGE_KEY = "snapvault:v1:items";
-export const SCHEMA_VERSION = 1;
+export const STORAGE_KEY = "snapvault:v2:items";
+export const LEGACY_STORAGE_KEY = "snapvault:v1:items";
+export const SCHEMA_VERSION = 2;
+const LEGACY_SCHEMA_VERSION = 1;
 export const STORAGE_CHANGED_EVENT = "storage:changed";
 export const STORAGE_QUOTA_EXCEEDED_EVENT = "storage:quota-exceeded";
 
@@ -60,9 +62,15 @@ export function clearAll() {
 }
 
 function readStore() {
-  const rawValue = getStorage().getItem(STORAGE_KEY);
+  const storage = getStorage();
+  const rawValue = storage.getItem(STORAGE_KEY);
 
   if (rawValue === null) {
+    const migratedStore = migrateLegacyStore(storage);
+    if (migratedStore) {
+      return migratedStore;
+    }
+
     return createStore();
   }
 
@@ -114,6 +122,7 @@ function normalizeItem(item) {
     type: normalizeRequiredString(item.type, "type"),
     createdAt: normalizeRequiredString(item.createdAt, "createdAt"),
     data: normalizeRequiredString(item.data, "data"),
+    beautyLevel: normalizeBeautyLevel(item.beautyLevel),
   };
 
   if (Object.hasOwn(item, "duration") && item.duration !== undefined) {
@@ -143,6 +152,20 @@ function normalizeDuration(duration) {
   return duration;
 }
 
+function normalizeBeautyLevel(value) {
+  if (value === undefined) {
+    return 0;
+  }
+
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    throw new TypeError("Storage item beautyLevel must be a finite number.");
+  }
+
+  return Math.min(100, Math.max(0, Math.round(numberValue)));
+}
+
 function cloneItem(item) {
   return { ...item };
 }
@@ -162,6 +185,49 @@ function restorePriorState(storage, priorValue) {
   }
 
   storage.setItem(STORAGE_KEY, priorValue);
+}
+
+function migrateLegacyStore(storage) {
+  const rawValue = storage.getItem(LEGACY_STORAGE_KEY);
+  if (rawValue === null) {
+    return null;
+  }
+
+  let parsedValue;
+  try {
+    parsedValue = JSON.parse(rawValue);
+  } catch (error) {
+    throw new Error("Legacy storage data is not valid JSON.", { cause: error });
+  }
+
+  const migratedStore = normalizeLegacyStore(parsedValue);
+
+  // Keep the v1 payload for one release as a safety net while all users move to v2.
+  storage.setItem(STORAGE_KEY, JSON.stringify(migratedStore));
+  return migratedStore;
+}
+
+function normalizeLegacyStore(value) {
+  if (!isRecord(value)) {
+    throw new Error("Legacy storage data must be an object.");
+  }
+
+  if (value.schemaVersion !== LEGACY_SCHEMA_VERSION) {
+    throw new Error(`Unsupported legacy storage schema version: ${value.schemaVersion}`);
+  }
+
+  if (!Array.isArray(value.items)) {
+    throw new Error("Legacy storage data must include an items array.");
+  }
+
+  return createStore(
+    value.items.map((item) =>
+      normalizeItem({
+        ...item,
+        beautyLevel: 0,
+      }),
+    ),
+  );
 }
 
 function emitQuotaExceeded(item, error) {

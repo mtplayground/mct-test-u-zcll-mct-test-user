@@ -179,6 +179,7 @@ export function handleTakePicture(videoEl, { beautyLevel = 0 } = {}) {
   try {
     const data = capturePicture(videoEl, { beautyLevel });
     addItem({
+      beautyLevel,
       createdAt: new Date().toISOString(),
       data,
       id: newId(),
@@ -236,6 +237,7 @@ export async function handleRecordVideo({
     );
 
     addItem({
+      beautyLevel: getBeautyLevel(),
       createdAt: new Date().toISOString(),
       data: recording.dataUrl,
       duration: recording.duration,
