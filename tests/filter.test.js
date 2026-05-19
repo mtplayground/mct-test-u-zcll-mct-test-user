@@ -23,6 +23,31 @@ describe("filterSpec", () => {
     expect(filterSpec(150)).toEqual(filterSpec(100));
   });
 
+  it("returns the expected descriptor shape for non-zero levels", () => {
+    const spec = filterSpec(40);
+
+    expect(spec).toEqual({
+      cssFilter: expect.stringMatching(
+        /^brightness\([0-9.]+\) contrast\([0-9.]+\) saturate\([0-9.]+\) sepia\([0-9.]+\) blur\([0-9.]+px\)$/,
+      ),
+      smoothing: {
+        blurPx: expect.any(Number),
+      },
+      glow: {
+        blurPx: expect.any(Number),
+        alpha: expect.any(Number),
+      },
+      params: {
+        brightness: expect.any(Number),
+        contrast: expect.any(Number),
+        saturation: expect.any(Number),
+        warmth: expect.any(Number),
+      },
+    });
+    expect(spec.cssFilter).not.toBe("none");
+    expect(spec.glow.alpha).toBeGreaterThan(0);
+  });
+
   it("maps levels deterministically with increasing beauty parameters", () => {
     const low = filterSpec(25);
     const high = filterSpec(75);

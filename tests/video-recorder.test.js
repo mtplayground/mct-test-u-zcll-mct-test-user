@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { recordVideo } from "../js/capture.js";
+import { createFilteredStream, recordVideo } from "../js/capture.js";
 import * as filterPipeline from "../js/filter.js";
 
 describe("recordVideo", () => {
@@ -228,6 +228,51 @@ describe("recordVideo", () => {
     expect(canvasTrack.stop).toHaveBeenCalledTimes(1);
   });
 
+  it("createFilteredStream draws frames through requestVideoFrameCallback", () => {
+    const audioTrack = createTrack("audio");
+    const canvasTrack = createTrack("video");
+    const rafCallbacks = [];
+    const videoFrameCallbacks = [];
+    const { canvas, video } = mockFilteredDom({
+      canvasTrack,
+      rafCallbacks,
+      useVideoFrameCallback: true,
+      videoFrameCallbacks,
+    });
+    const sourceStream = createStream({
+      audioTracks: [audioTrack],
+      videoTracks: [createTrack("video", { height: 450, width: 800 })],
+    });
+    const applyToCanvas = vi.spyOn(filterPipeline, "applyToCanvas");
+    let currentBeautyLevel = 22;
+
+    const filteredStream = createFilteredStream(
+      sourceStream,
+      () => currentBeautyLevel,
+    );
+
+    expect(filteredStream.getVideoTracks()).toEqual([canvasTrack]);
+    expect(filteredStream.getAudioTracks()).toEqual([audioTrack]);
+    expect(video.hidden).toBe(true);
+    expect(canvas.hidden).toBe(true);
+    expect(canvas.width).toBe(800);
+    expect(canvas.height).toBe(450);
+    expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
+    expect(window.requestAnimationFrame).not.toHaveBeenCalled();
+
+    currentBeautyLevel = 64;
+    videoFrameCallbacks.shift()();
+
+    expect(applyToCanvas).toHaveBeenCalledWith(
+      canvas.context,
+      video,
+      1280,
+      720,
+      64,
+    );
+    expect(video.requestVideoFrameCallback).toHaveBeenCalledTimes(2);
+  });
+
   it("rejects an invalid stream before creating a recorder", async () => {
     const Recorder = createMediaRecorderStub({
       instances: recorderInstances,
@@ -312,7 +357,12 @@ function createTrack(kind, settings = {}) {
   };
 }
 
-function mockFilteredDom({ canvasTrack, rafCallbacks }) {
+function mockFilteredDom({
+  canvasTrack,
+  rafCallbacks,
+  useVideoFrameCallback = false,
+  videoFrameCallbacks = [],
+}) {
   const originalCreateElement = document.createElement.bind(document);
   const video = {
     hidden: false,
@@ -328,6 +378,13 @@ function mockFilteredDom({ canvasTrack, rafCallbacks }) {
     videoHeight: 720,
     videoWidth: 1280,
   };
+  if (useVideoFrameCallback) {
+    video.requestVideoFrameCallback = vi.fn((callback) => {
+      videoFrameCallbacks.push(callback);
+      return videoFrameCallbacks.length;
+    });
+    video.cancelVideoFrameCallback = vi.fn();
+  }
   const canvas = {
     captureStream: vi.fn(() =>
       createStream({
