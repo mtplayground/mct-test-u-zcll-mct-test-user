@@ -97,6 +97,48 @@ describe("recordVideo", () => {
     expect(result.duration).toBe(2);
   });
 
+  it("stops early through the onStart handle, finalizes once, and reports elapsed duration", async () => {
+    const stopCalls = [];
+    let stopHandle;
+
+    globalThis.FileReader = createFileReaderStub(fileReaderBlobs);
+    globalThis.MediaRecorder = createMediaRecorderStub({
+      instances: recorderInstances,
+      isTypeSupported: vi.fn(() => false),
+      onStop: (recorder) => {
+        stopCalls.push(recorder);
+        recorder.emitChunk(new Blob(["early"], { type: "text/plain" }));
+      },
+    });
+
+    const recording = recordVideo(createStream(), {
+      maxSeconds: 15,
+      onStart: ({ stop }) => {
+        stopHandle = stop;
+      },
+    });
+    const recorder = recorderInstances[0];
+
+    expect(recorder.state).toBe("recording");
+    expect(stopHandle).toEqual(expect.any(Function));
+
+    await vi.advanceTimersByTimeAsync(4_250);
+    stopHandle();
+    stopHandle();
+
+    const result = await recording;
+
+    expect(stopCalls).toEqual([recorder]);
+    expect(fileReaderBlobs).toHaveLength(1);
+    await expect(fileReaderBlobs[0].text()).resolves.toBe("early");
+    expect(result.duration).toBe(4.25);
+    expect(result.duration).toBeLessThan(15);
+
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(stopCalls).toHaveLength(1);
+    expect(fileReaderBlobs).toHaveLength(1);
+  });
+
   it("rejects an invalid stream before creating a recorder", async () => {
     const Recorder = createMediaRecorderStub({
       instances: recorderInstances,
