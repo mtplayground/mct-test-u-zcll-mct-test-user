@@ -68,6 +68,27 @@ describe("beauty slider UI wiring", () => {
     });
   });
 
+  it("passes the active beauty level callback when recording video", async () => {
+    const stream = { getTracks: vi.fn(() => []) };
+    const { recordVideo } = mockAppModules({ stream });
+    document.body.innerHTML = `${createBeautyMarkup({ includePreview: true })}
+      <button id="record-video" type="button">Record</button>`;
+
+    await import("../js/app.js");
+
+    const slider = document.querySelector("#beauty-level");
+    slider.value = "72";
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+    document.querySelector("#record-video").click();
+
+    expect(recordVideo).toHaveBeenCalledWith(stream, {
+      getBeautyLevel: expect.any(Function),
+      maxSeconds: 15,
+      onStart: expect.any(Function),
+    });
+    expect(recordVideo.mock.calls[0][1].getBeautyLevel()).toBe(72);
+  });
+
   it("defaults picture capture to level 0 when the slider is missing", async () => {
     const stream = { getTracks: vi.fn(() => []) };
     const { capturePicture } = mockAppModules({ stream });
@@ -147,6 +168,7 @@ describe("beauty slider UI wiring", () => {
 function mockAppModules({ stream = null } = {}) {
   const addItem = vi.fn();
   const capturePicture = vi.fn(() => "data:image/jpeg;base64,captured");
+  const recordVideo = vi.fn(() => new Promise(() => {}));
 
   vi.doMock("../js/camera.js", () => ({
     getStream: () => stream,
@@ -156,7 +178,7 @@ function mockAppModules({ stream = null } = {}) {
   }));
   vi.doMock("../js/capture.js", () => ({
     capturePicture,
-    recordVideo: vi.fn(),
+    recordVideo,
   }));
   vi.doMock("../js/storage.js", () => ({
     addItem,
@@ -166,7 +188,7 @@ function mockAppModules({ stream = null } = {}) {
     newId: () => "capture-id",
   }));
 
-  return { addItem, capturePicture };
+  return { addItem, capturePicture, recordVideo };
 }
 
 function createBeautyMarkup({ includePreview = false } = {}) {
