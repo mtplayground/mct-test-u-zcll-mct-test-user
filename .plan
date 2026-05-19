@@ -1,58 +1,51 @@
-Architecture plan for issues #65-#67
+Architecture plan for issues #71-#79
 
 Project shape
 - Static browser-only camera capture app using plain HTML, CSS, and ES modules.
-- Runtime code lives under `js/`; tests live under `tests/` and use Vitest with
-  `happy-dom` plus mocked browser APIs.
-- No backend database is needed for this batch. Captured media continues to be stored
-  locally through the existing `js/storage.js` path.
+- Runtime modules live in `js/`; UI shell is `index.html`; styling is `styles.css`.
+- Tests use Vitest with browser API stubs under `tests/`.
+- Persistence remains browser-local through `localStorage`; no server database is part of
+  this feature set.
 
-Relevant modules
-- `js/capture.js`
-  - Owns `capturePicture(videoEl)` and `recordVideo(stream, options)`.
-  - `recordVideo` currently starts a `MediaRecorder`, auto-stops at `maxSeconds`, collects
-    chunks, converts the final `Blob` to a data URL, and resolves with
-    `{ dataUrl, duration, mimeType }`.
-  - Issue #65 should extend this function with `options.onStart`, called once the
-    recorder is recording, with a stable `{ stop }` handle.
-- `js/app.js`
-  - Owns app event wiring, recording state, countdown ticks, control enable/disable
-    state, and saving video items through `addItem`.
-  - Issue #66 should keep the record button enabled while recording, switch its
-    visible/ARIA label to Stop, wire it to the stop handle from `recordVideo`, and reset
-    UI state in the existing recording cleanup path.
-- `styles.css`
-  - Owns button and recording indicator styling.
-  - Issue #66 may need one focused active-recording button style if no existing class
-    can express the Stop state clearly.
-- `tests/video-recorder.test.js`
-  - Unit coverage for `recordVideo` behavior and MediaRecorder stubs.
-  - Issue #67 should add early-stop coverage here.
-- `tests/app-record-button.test.js`
-  - UI wiring coverage for record button state and saved video items.
-  - Issue #67 should extend this for Record-to-Stop label/state behavior.
-- `tests/app-recording.test.js`
-  - Recording guard/countdown tests for `runRecordingTask`.
-  - Issue #67 should cover the end-to-end app flow around early stop and duration.
+Module structure and shared contracts
+- Add `js/filter.js` as the shared beauty-filter module.
+  - Export `filterSpec(beautyLevel)` returning:
+    `{ cssFilter, smoothing: { blurPx }, glow: { blurPx, alpha }, params: { brightness, contrast, saturation, warmth } }`.
+  - Export `applyToCanvas(ctx, source, w, h, beautyLevel)` for still-image and video-frame rendering.
+  - Clamp and normalize levels inside this module so callers can pass raw slider values safely.
+  - Level `0` is a strict no-op: `cssFilter === "none"`, no blur/glow, neutral params.
+- Extend `js/capture.js`.
+  - `capturePicture(videoEl, { beautyLevel })` delegates drawing to `applyToCanvas`.
+  - Add `createFilteredStream(sourceStream, getBeautyLevel)` to render video frames through a hidden canvas and merge the original audio track.
+  - `recordVideo` accepts an optional filtered stream path without breaking existing callers.
+- Extend `js/app.js`.
+  - Own slider wiring, restored beauty level, live preview updates, and passing the active level into picture/video capture and storage.
+  - Keep UI state updates centralized so slider, preview, capture, record, and gallery stay in sync.
+- Extend `js/storage.js`.
+  - Bump stored item key to `snapvault:v2:items`.
+  - Migrate `snapvault:v1:items` to v2 by adding `beautyLevel: 0`; leave v1 in place for one release.
+  - Store the last-used slider level separately as `snapvault:v2:beauty-level`.
+- Extend `js/gallery.js` and `styles.css`.
+  - Render a high-contrast badge only when `beautyLevel > 0`.
+  - Keep level-0 captures visually unchanged.
 
 Issue dependencies
-- #65 is the foundation. The app cannot stop recording early until `recordVideo` exposes
-  a safe handle.
-- #66 depends on #65. The UI should store the current stop handle while a recording is
-  active and call it when the same button is clicked in Stop mode.
-- #67 depends on #65 and #66. Add focused tests after the implementation shape is known,
-  using the existing MediaRecorder/app mocks rather than adding new libraries.
+- #71 is the foundation for all filter math and canvas rendering.
+- #72 depends on the existing HTML shell and can use #71 for slider semantics, but should not need capture changes.
+- #73 depends on #71 and #72.
+- #74 depends on #71 and the existing picture capture flow.
+- #75 depends on #71 and should integrate carefully with the existing recording contract.
+- #76 can land before gallery display but should coordinate with #72 and capture callers.
+- #77 depends on #76 so cards can read `beautyLevel`.
+- #78 should follow the implementation issues and cover the shared model, preview/capture/recording integrations, storage migration, and gallery badge behavior.
+- #79 should land after behavior is stable enough to document and manually verify.
 
 Key design decisions
-- Keep the public `recordVideo` contract backward compatible:
-  `recordVideo(stream, { maxSeconds })` must keep working.
-- Add only one new option, `onStart`, and call it after `recorder.start()` has put the
-  recorder into the recording state.
-- The stop handle should be idempotent. Calling `stop()` more than once, or after the
-  recorder is already inactive, should not throw or finalize chunks twice.
-- Duration should use actual elapsed wall-clock time for manual stops, while auto-stop
-  remains capped by `maxSeconds`.
-- Preserve the existing single-recording guard in `app.js`; do not allow a second
-  recording to start while one is active.
-- Keep UI state cleanup centralized in the existing `finally` path so manual stop,
-  auto-stop, and recorder errors all reset controls consistently.
+- Keep the app dependency-free; use Canvas 2D, CSS filters, `captureStream()`, and existing test tooling.
+- Put every beauty-level mapping in `js/filter.js`; callers should not duplicate filter constants.
+- Treat invalid or missing beauty levels as `0` for backward compatibility and migration safety.
+- Preserve existing public contracts where possible by adding optional parameters rather than changing return shapes.
+- Use `requestVideoFrameCallback` when available and fall back to `requestAnimationFrame` for filtered video recording.
+- Avoid face detection or identity-specific processing; the feature is a deterministic global visual filter.
+- Keep storage migration idempotent and non-destructive.
+- Tests should focus on deterministic filter output, no-op behavior at level 0, caller integration, migration safety, and badge visibility.
