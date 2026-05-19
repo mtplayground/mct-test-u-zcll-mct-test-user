@@ -17,12 +17,14 @@ describe("gallery rendering", () => {
 
     renderGallery(container, [
       {
+        beautyLevel: 40,
         createdAt: "2026-05-18T12:00:00.000Z",
         data: "data:image/jpeg;base64,picture",
         id: "picture-1",
         type: "picture",
       },
       {
+        beautyLevel: 0,
         createdAt: "2026-05-18T12:05:00.000Z",
         data: "data:video/webm;base64,video",
         duration: 15,
@@ -42,6 +44,9 @@ describe("gallery rendering", () => {
       "Download Picture",
     );
     expect(cards[0].querySelector("a")?.href).toBe("data:image/jpeg;base64,picture");
+    expect(cards[0].querySelector(".gallery-card__beauty-badge")?.textContent).toBe(
+      "Beauty 40",
+    );
     expect(cards[0].querySelector("button")?.getAttribute("aria-label")).toBe(
       "Delete Picture",
     );
@@ -55,6 +60,36 @@ describe("gallery rendering", () => {
     expect(cards[1].querySelector("a")?.getAttribute("aria-label")).toBe(
       "Download Video",
     );
+    expect(cards[1].querySelector(".gallery-card__beauty-badge")).toBeNull();
+  });
+
+  it("omits the beauty badge for missing, invalid, and zero levels", () => {
+    const container = document.createElement("div");
+
+    renderGallery(container, [
+      {
+        createdAt: "2026-05-18T12:00:00.000Z",
+        data: "data:image/jpeg;base64,picture",
+        id: "missing-level",
+        type: "picture",
+      },
+      {
+        beautyLevel: Number.NaN,
+        createdAt: "2026-05-18T12:01:00.000Z",
+        data: "data:image/jpeg;base64,picture",
+        id: "invalid-level",
+        type: "picture",
+      },
+      {
+        beautyLevel: 0,
+        createdAt: "2026-05-18T12:02:00.000Z",
+        data: "data:image/jpeg;base64,picture",
+        id: "zero-level",
+        type: "picture",
+      },
+    ]);
+
+    expect(container.querySelectorAll(".gallery-card__beauty-badge")).toHaveLength(0);
   });
 
   it("renders an empty state when storage has no items", () => {

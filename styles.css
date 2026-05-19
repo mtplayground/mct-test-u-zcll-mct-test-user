@@ -310,6 +310,7 @@ a:focus-visible {
 .gallery-card__media {
   aspect-ratio: 4 / 3;
   background: var(--surface-muted);
+  position: relative;
 }
 
 .gallery-card__media img,
@@ -318,6 +319,20 @@ a:focus-visible {
   height: 100%;
   object-fit: cover;
   width: 100%;
+}
+
+.gallery-card__beauty-badge {
+  background: rgb(16 24 32 / 88%);
+  border: 1px solid rgb(255 255 255 / 36%);
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  padding: 0.4rem 0.55rem;
+  position: absolute;
+  right: var(--space-2);
+  top: var(--space-2);
 }
 
 .gallery-card__meta {

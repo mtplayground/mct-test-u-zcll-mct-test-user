@@ -80,6 +80,10 @@ function createGalleryCard(item) {
   const media = document.createElement("div");
   media.className = "gallery-card__media";
   media.append(createMediaElement(item));
+  const beautyBadge = createBeautyBadge(item);
+  if (beautyBadge) {
+    media.append(beautyBadge);
+  }
 
   const meta = document.createElement("div");
   meta.className = "gallery-card__meta";
@@ -149,6 +153,19 @@ function createMediaElement(item) {
   unsupported.className = "gallery-card__unsupported";
   unsupported.textContent = "Unsupported capture";
   return unsupported;
+}
+
+function createBeautyBadge(item) {
+  const beautyLevel = normalizeBeautyLevel(item.beautyLevel);
+
+  if (beautyLevel <= 0) {
+    return null;
+  }
+
+  const badge = document.createElement("span");
+  badge.className = "gallery-card__beauty-badge";
+  badge.textContent = `Beauty ${beautyLevel}`;
+  return badge;
 }
 
 function createEmptyState() {
@@ -229,6 +246,16 @@ function getFileExtension(item) {
 function getDataUrlMimeType(dataUrl) {
   const match = /^data:([^;,]+)/.exec(dataUrl);
   return match ? match[1].toLowerCase() : "";
+}
+
+function normalizeBeautyLevel(value) {
+  const numberValue = Number(value);
+
+  if (!Number.isFinite(numberValue)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(numberValue)));
 }
 
 function confirmDelete() {
