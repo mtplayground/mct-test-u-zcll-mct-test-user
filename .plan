@@ -1,51 +1,28 @@
-Architecture plan for issues #71-#79
+Architecture plan for issues #89-#90
 
 Project shape
 - Static browser-only camera capture app using plain HTML, CSS, and ES modules.
-- Runtime modules live in `js/`; UI shell is `index.html`; styling is `styles.css`.
-- Tests use Vitest with browser API stubs under `tests/`.
-- Persistence remains browser-local through `localStorage`; no server database is part of
-  this feature set.
+- Runtime modules live in `js/`; gallery rendering is isolated in `js/gallery.js`.
+- Tests use Vitest with DOM APIs from the configured test environment.
+- Captures persist in browser `localStorage` as storage item records from `js/storage.js`.
 
 Module structure and shared contracts
-- Add `js/filter.js` as the shared beauty-filter module.
-  - Export `filterSpec(beautyLevel)` returning:
-    `{ cssFilter, smoothing: { blurPx }, glow: { blurPx, alpha }, params: { brightness, contrast, saturation, warmth } }`.
-  - Export `applyToCanvas(ctx, source, w, h, beautyLevel)` for still-image and video-frame rendering.
-  - Clamp and normalize levels inside this module so callers can pass raw slider values safely.
-  - Level `0` is a strict no-op: `cssFilter === "none"`, no blur/glow, neutral params.
-- Extend `js/capture.js`.
-  - `capturePicture(videoEl, { beautyLevel })` delegates drawing to `applyToCanvas`.
-  - Add `createFilteredStream(sourceStream, getBeautyLevel)` to render video frames through a hidden canvas and merge the original audio track.
-  - `recordVideo` accepts an optional filtered stream path without breaking existing callers.
-- Extend `js/app.js`.
-  - Own slider wiring, restored beauty level, live preview updates, and passing the active level into picture/video capture and storage.
-  - Keep UI state updates centralized so slider, preview, capture, record, and gallery stay in sync.
-- Extend `js/storage.js`.
-  - Bump stored item key to `snapvault:v2:items`.
-  - Migrate `snapvault:v1:items` to v2 by adding `beautyLevel: 0`; leave v1 in place for one release.
-  - Store the last-used slider level separately as `snapvault:v2:beauty-level`.
-- Extend `js/gallery.js` and `styles.css`.
-  - Render a high-contrast badge only when `beautyLevel > 0`.
-  - Keep level-0 captures visually unchanged.
+- Keep the stored item shape unchanged: video items continue to store `data:<mime>;base64,<payload>` in `item.data`.
+- Add gallery-local helpers in `js/gallery.js` for video blob handling:
+  - Parse data URLs into `{ mimeType, bytes }` without changing storage.
+  - Build `Blob` instances from decoded `Uint8Array` payloads.
+  - Create object URLs for rendered video cards with `URL.createObjectURL`.
+  - Choose download extensions from the parsed MIME type, using `.webm` and `.mp4` for supported video types.
+- Keep picture cards on existing data URLs so still-image behavior remains unchanged.
+- Track object URLs created during each render and revoke them before replacement/re-render and when deleting cards, preventing leaked browser resources.
 
 Issue dependencies
-- #71 is the foundation for all filter math and canvas rendering.
-- #72 depends on the existing HTML shell and can use #71 for slider semantics, but should not need capture changes.
-- #73 depends on #71 and #72.
-- #74 depends on #71 and the existing picture capture flow.
-- #75 depends on #71 and should integrate carefully with the existing recording contract.
-- #76 can land before gallery display but should coordinate with #72 and capture callers.
-- #77 depends on #76 so cards can read `beautyLevel`.
-- #78 should follow the implementation issues and cover the shared model, preview/capture/recording integrations, storage migration, and gallery badge behavior.
-- #79 should land after behavior is stable enough to document and manually verify.
+- #89 is the implementation issue and should land first. It changes runtime gallery rendering and cleanup behavior.
+- #90 depends on #89. Its tests should assert the blob URL path for video cards, preserve picture data URL coverage, and verify cleanup via `URL.revokeObjectURL`.
 
 Key design decisions
-- Keep the app dependency-free; use Canvas 2D, CSS filters, `captureStream()`, and existing test tooling.
-- Put every beauty-level mapping in `js/filter.js`; callers should not duplicate filter constants.
-- Treat invalid or missing beauty levels as `0` for backward compatibility and migration safety.
-- Preserve existing public contracts where possible by adding optional parameters rather than changing return shapes.
-- Use `requestVideoFrameCallback` when available and fall back to `requestAnimationFrame` for filtered video recording.
-- Avoid face detection or identity-specific processing; the feature is a deterministic global visual filter.
-- Keep storage migration idempotent and non-destructive.
-- Tests should focus on deterministic filter output, no-op behavior at level 0, caller integration, migration safety, and badge visibility.
+- Blob conversion belongs in `js/gallery.js` because it is a presentation/download concern, not a storage schema change.
+- Avoid adding dependencies; use browser-native `atob`, `Uint8Array`, `Blob`, and `URL` APIs.
+- Keep helper functions small and test through DOM behavior unless direct exports are already necessary.
+- Gracefully fall back to existing data URLs if a video data URL is malformed, so one bad stored item does not break the whole gallery render.
+- Tests should stub `URL.createObjectURL` and `URL.revokeObjectURL` deterministically and assert the created `Blob.type`.
