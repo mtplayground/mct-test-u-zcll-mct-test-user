@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { filterSpec } from "../js/filter.js";
+
 const BEAUTY_LEVEL_STORAGE_KEY = "snapvault:v2:beauty-level";
 
 describe("beauty slider UI wiring", () => {
@@ -43,17 +45,45 @@ describe("beauty slider UI wiring", () => {
     expect(localStorage.getItem(BEAUTY_LEVEL_STORAGE_KEY)).toBe("67");
   });
 
-  it("resets the level to 0 and persists the reset value", async () => {
-    localStorage.setItem(BEAUTY_LEVEL_STORAGE_KEY, "88");
-    document.body.innerHTML = createBeautyMarkup();
+  it("applies the beauty filter to the live preview as the slider changes", async () => {
+    document.body.innerHTML = createBeautyMarkup({ includePreview: true });
     mockAppModules();
 
     await import("../js/app.js");
+
+    const slider = document.querySelector("#beauty-level");
+    const preview = document.querySelector("#camera-preview");
+
+    expect(preview.style.filter).toBe("none");
+
+    slider.value = "55";
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+
+    expect(preview.style.filter).toBe(filterSpec(55).cssFilter);
+    expect(preview.style.filter).not.toBe("none");
+
+    slider.value = "0";
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+
+    expect(preview.style.filter).toBe("none");
+  });
+
+  it("resets the level to 0 and persists the reset value", async () => {
+    localStorage.setItem(BEAUTY_LEVEL_STORAGE_KEY, "88");
+    document.body.innerHTML = createBeautyMarkup({ includePreview: true });
+    mockAppModules();
+
+    await import("../js/app.js");
+
+    expect(document.querySelector("#camera-preview").style.filter).toBe(
+      filterSpec(88).cssFilter,
+    );
 
     document.querySelector("#reset-beauty-level").click();
 
     expect(document.querySelector("#beauty-level").value).toBe("0");
     expect(document.querySelector("#beauty-level-value").textContent).toBe("0");
+    expect(document.querySelector("#camera-preview").style.filter).toBe("none");
     expect(localStorage.getItem(BEAUTY_LEVEL_STORAGE_KEY)).toBe("0");
   });
 
@@ -95,9 +125,10 @@ function mockAppModules() {
   }));
 }
 
-function createBeautyMarkup() {
+function createBeautyMarkup({ includePreview = false } = {}) {
   return `
     <div id="status-root" class="status-stack"></div>
+    ${includePreview ? '<video id="camera-preview"></video>' : ""}
     <div class="beauty-control" aria-labelledby="beauty-level-label">
       <label id="beauty-level-label" for="beauty-level">Beauty</label>
       <output id="beauty-level-value" for="beauty-level">0</output>
