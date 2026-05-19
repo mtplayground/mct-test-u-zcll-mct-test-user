@@ -1,16 +1,20 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { capturePicture } from "../js/capture.js";
+import * as filterPipeline from "../js/filter.js";
 
 describe("capturePicture", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("draws the video frame to an intrinsic-size canvas and returns a JPEG data URL", () => {
+  it("renders the video frame through the shared canvas pipeline", () => {
     const videoEl = createVideoElement({ height: 480, width: 640 });
     const canvas = createCanvasStub("data:image/jpeg;base64,captured");
     const originalCreateElement = document.createElement.bind(document);
+    const applyToCanvas = vi
+      .spyOn(filterPipeline, "applyToCanvas")
+      .mockImplementation(() => filterPipeline.filterSpec(0));
 
     vi.spyOn(document, "createElement").mockImplementation((tagName) => {
       if (tagName === "canvas") {
@@ -26,8 +30,30 @@ describe("capturePicture", () => {
     expect(canvas.width).toBe(640);
     expect(canvas.height).toBe(480);
     expect(canvas.getContext).toHaveBeenCalledWith("2d");
-    expect(canvas.context.drawImage).toHaveBeenCalledWith(videoEl, 0, 0, 640, 480);
+    expect(applyToCanvas).toHaveBeenCalledWith(canvas.context, videoEl, 640, 480, 0);
     expect(canvas.toDataURL).toHaveBeenCalledWith("image/jpeg", 0.9);
+  });
+
+  it("passes the requested beauty level to the canvas pipeline", () => {
+    const videoEl = createVideoElement({ height: 720, width: 1280 });
+    const canvas = createCanvasStub("data:image/jpeg;base64,filtered");
+    const originalCreateElement = document.createElement.bind(document);
+    const applyToCanvas = vi
+      .spyOn(filterPipeline, "applyToCanvas")
+      .mockImplementation(() => filterPipeline.filterSpec(45));
+
+    vi.spyOn(document, "createElement").mockImplementation((tagName) => {
+      if (tagName === "canvas") {
+        return canvas;
+      }
+
+      return originalCreateElement(tagName);
+    });
+
+    expect(capturePicture(videoEl, { beautyLevel: 45 })).toBe(
+      "data:image/jpeg;base64,filtered",
+    );
+    expect(applyToCanvas).toHaveBeenCalledWith(canvas.context, videoEl, 1280, 720, 45);
   });
 
   it("rejects videos before intrinsic dimensions are available", () => {
@@ -52,7 +78,10 @@ function createVideoElement({ height, width }) {
 
 function createCanvasStub(dataUrl) {
   const context = {
+    clearRect: vi.fn(),
     drawImage: vi.fn(),
+    restore: vi.fn(),
+    save: vi.fn(),
   };
 
   return {

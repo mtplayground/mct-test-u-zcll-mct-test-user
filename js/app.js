@@ -66,7 +66,9 @@ export function initApp(root = document) {
 
   if (takePictureButton && videoEl) {
     takePictureButton.addEventListener("click", () => {
-      handleTakePicture(videoEl);
+      handleTakePicture(videoEl, {
+        beautyLevel: getSliderBeautyLevel(beautyControls.slider),
+      });
     });
   }
 
@@ -172,9 +174,9 @@ export async function handleSwitchCamera(controls = {}) {
   }
 }
 
-export function handleTakePicture(videoEl) {
+export function handleTakePicture(videoEl, { beautyLevel = 0 } = {}) {
   try {
-    const data = capturePicture(videoEl);
+    const data = capturePicture(videoEl, { beautyLevel });
     addItem({
       createdAt: new Date().toISOString(),
       data,
@@ -444,6 +446,10 @@ function normalizeBeautyLevel(value) {
   }
 
   return Math.min(100, Math.max(0, Math.round(numberValue)));
+}
+
+function getSliderBeautyLevel(slider) {
+  return normalizeBeautyLevel(slider?.value);
 }
 
 function applyPreviewFilter(videoEl, beautyLevel) {

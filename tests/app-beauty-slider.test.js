@@ -45,6 +45,45 @@ describe("beauty slider UI wiring", () => {
     expect(localStorage.getItem(BEAUTY_LEVEL_STORAGE_KEY)).toBe("67");
   });
 
+  it("passes the active beauty level when taking a picture", async () => {
+    const stream = { getTracks: vi.fn(() => []) };
+    const { addItem, capturePicture } = mockAppModules({ stream });
+    document.body.innerHTML = `${createBeautyMarkup({ includePreview: true })}
+      <button id="take-picture" type="button">Take Picture</button>`;
+
+    await import("../js/app.js");
+
+    const slider = document.querySelector("#beauty-level");
+    slider.value = "46";
+    slider.dispatchEvent(new window.Event("input", { bubbles: true }));
+    document.querySelector("#take-picture").click();
+
+    const videoEl = document.querySelector("#camera-preview");
+    expect(capturePicture).toHaveBeenCalledWith(videoEl, { beautyLevel: 46 });
+    expect(addItem).toHaveBeenCalledWith({
+      createdAt: expect.any(String),
+      data: "data:image/jpeg;base64,captured",
+      id: "capture-id",
+      type: "picture",
+    });
+  });
+
+  it("defaults picture capture to level 0 when the slider is missing", async () => {
+    const stream = { getTracks: vi.fn(() => []) };
+    const { capturePicture } = mockAppModules({ stream });
+    document.body.innerHTML = `
+      <video id="camera-preview"></video>
+      <button id="take-picture" type="button">Take Picture</button>
+    `;
+
+    await import("../js/app.js");
+
+    const videoEl = document.querySelector("#camera-preview");
+    document.querySelector("#take-picture").click();
+
+    expect(capturePicture).toHaveBeenCalledWith(videoEl, { beautyLevel: 0 });
+  });
+
   it("applies the beauty filter to the live preview as the slider changes", async () => {
     document.body.innerHTML = createBeautyMarkup({ includePreview: true });
     mockAppModules();
@@ -105,24 +144,29 @@ describe("beauty slider UI wiring", () => {
   });
 });
 
-function mockAppModules() {
+function mockAppModules({ stream = null } = {}) {
+  const addItem = vi.fn();
+  const capturePicture = vi.fn(() => "data:image/jpeg;base64,captured");
+
   vi.doMock("../js/camera.js", () => ({
-    getStream: () => null,
+    getStream: () => stream,
     startCamera: vi.fn(),
     stopCamera: vi.fn(),
     switchCamera: vi.fn(),
   }));
   vi.doMock("../js/capture.js", () => ({
-    capturePicture: vi.fn(),
+    capturePicture,
     recordVideo: vi.fn(),
   }));
   vi.doMock("../js/storage.js", () => ({
-    addItem: vi.fn(),
+    addItem,
     STORAGE_QUOTA_EXCEEDED_EVENT: "storage:quota-exceeded",
   }));
   vi.doMock("../js/utils.js", () => ({
     newId: () => "capture-id",
   }));
+
+  return { addItem, capturePicture };
 }
 
 function createBeautyMarkup({ includePreview = false } = {}) {
