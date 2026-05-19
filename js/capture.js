@@ -1,3 +1,5 @@
+import * as filterPipeline from "./filter.js";
+
 const JPEG_MIME_TYPE = "image/jpeg";
 const JPEG_QUALITY = 0.9;
 const DEFAULT_MAX_RECORDING_SECONDS = 15;
@@ -7,7 +9,7 @@ const VIDEO_MIME_TYPES = [
   "video/mp4",
 ];
 
-export function capturePicture(videoEl) {
+export function capturePicture(videoEl, { beautyLevel = 0 } = {}) {
   assertVideoElement(videoEl);
 
   const width = normalizeDimension(videoEl.videoWidth, "videoWidth");
@@ -21,7 +23,7 @@ export function capturePicture(videoEl) {
     throw new Error("Unable to create a 2D canvas context for picture capture.");
   }
 
-  context.drawImage(videoEl, 0, 0, width, height);
+  filterPipeline.applyToCanvas(context, videoEl, width, height, beautyLevel);
   return canvas.toDataURL(JPEG_MIME_TYPE, JPEG_QUALITY);
 }
 
