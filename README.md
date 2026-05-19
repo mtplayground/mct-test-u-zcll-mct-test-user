@@ -25,6 +25,18 @@ Modern Chromium, Firefox, and Safari releases support the core APIs used by this
 Browser behavior can still vary by device, especially for camera switching,
 `MediaRecorder` codecs, and iOS camera permission handling.
 
+## Beauty Filter
+
+The camera area includes a **Beauty** slider from `0` to `100`. Level `0` is a true
+no-op: the live preview, captured pictures, and recorded video are left unfiltered, and
+gallery cards do not show a beauty badge. Higher levels apply the same deterministic
+global filter model to the preview, captured pictures, and recorded video. The most
+recent slider value is saved in `localStorage` so it is restored on the next visit.
+
+The filter is intentionally simple and local to the browser. It does not perform face
+detection, identity recognition, background segmentation, or any server-side image
+processing. Captures remain stored only in the browser's local storage.
+
 ## Local Development
 
 Install dependencies:
