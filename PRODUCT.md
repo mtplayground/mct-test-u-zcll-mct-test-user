@@ -20,6 +20,8 @@ the browser.
   `beautyLevel`.
 - Renders a reactive gallery with picture/video cards, timestamps, download links,
   delete actions, Beauty badges for filtered captures, and Clear All.
+- Rebuilds stored video data URLs into `Blob` object URLs for gallery playback and
+  downloads, while keeping picture cards on data URLs.
 - Shows status banners for success, camera errors, and storage quota failures.
 
 ## Key User Constraints
@@ -45,8 +47,9 @@ the browser.
   handle.
 - `js/storage.js` owns schema validation, CRUD, quota rollback, storage events, and
   one-release migration from `snapvault:v1:items` to `snapvault:v2:items`.
-- `js/gallery.js` renders gallery state from storage, including Beauty badges, and
-  reacts to storage changes.
+- `js/gallery.js` renders gallery state from storage, including Beauty badges, video
+  `blob:` URLs, download filenames, and object URL cleanup on re-render, delete, Clear
+  All, and unsubscribe.
 - `js/ui.js` owns status banners and shared UI events.
 - `js/errors.js` maps media-device errors to user-facing messages.
 - `scripts/dev-server.js` is the lightweight static file server used for local and
@@ -58,8 +61,8 @@ the browser.
 
 - Unit tests use Vitest with `happy-dom`; current coverage includes the Beauty filter
   model, filtered picture capture, filtered recording stream setup, storage migration,
-  gallery badges, early-stop video recording, Record/Stop button state, and app-level
-  save flows.
+  gallery badges, video blob URL rendering and cleanup, early-stop video recording,
+  Record/Stop button state, and app-level save flows.
 - E2E smoke testing uses Playwright Chromium with fake camera/microphone streams.
 - `npm run verify:prod` serves the static app over local HTTPS with a temporary
   certificate and runs a production-style smoke flow.
