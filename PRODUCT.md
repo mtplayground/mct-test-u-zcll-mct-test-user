@@ -10,8 +10,8 @@ the browser.
 
 - Starts, stops, and switches the active camera using `getUserMedia`.
 - Captures still pictures from the live video preview as JPEG data URLs.
-- Records short videos with `MediaRecorder`, a 15-second countdown, and supported MIME
-  fallback.
+- Records short videos with `MediaRecorder`, a 15-second countdown, supported MIME
+  fallback, and a Stop button for ending recordings early.
 - Stores captures in `localStorage` under a versioned schema.
 - Renders a reactive gallery with picture/video cards, timestamps, download links,
   delete actions, and Clear All.
@@ -29,9 +29,11 @@ the browser.
 
 - `index.html` is the app shell.
 - `styles.css` contains responsive layout, accessibility polish, and theme variables.
-- `js/app.js` wires UI controls and high-level workflows.
+- `js/app.js` wires UI controls and high-level workflows, including the Record/Stop
+  recording button state.
 - `js/camera.js` owns camera start/stop/switch behavior and capability detection.
-- `js/capture.js` owns picture capture and video recording.
+- `js/capture.js` owns picture capture and video recording, including the
+  `recordVideo(..., { onStart })` stop handle.
 - `js/storage.js` owns schema validation, CRUD, quota rollback, and storage events.
 - `js/gallery.js` renders gallery state from storage and reacts to storage changes.
 - `js/ui.js` owns status banners and shared UI events.
@@ -43,7 +45,8 @@ the browser.
 
 ## Testing and Verification
 
-- Unit tests use Vitest with `happy-dom`.
+- Unit tests use Vitest with `happy-dom`; current coverage includes early-stop video
+  recording, Record/Stop button state, and app-level early-stop save flow.
 - E2E smoke testing uses Playwright Chromium with fake camera/microphone streams.
 - `npm run verify:prod` serves the static app over local HTTPS with a temporary
   certificate and runs a production-style smoke flow.
